@@ -1,68 +1,97 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`c3`](https://developers.cloudflare.com/pages/get-started/c3).
+# Tamagochi App – Cloudflare-Powered Virtual Pet
 
-## Getting Started
+**Tamagochi App** is a playful, experimental project built with **Next.js** and  
+deployed on **Cloudflare Pages** + **Workers**.  
 
-First, run the development server:
+The goal is to reimagine the classic Tamagotchi experience as a modern,  
+serverless web application – where users can raise, interact with, and care  
+for a virtual pet directly in the browser.
+
+---
+
+## ✨ Key Features (Planned)
+
+- 🐣 **Virtual Pet Simulation** – feed, play, and interact with your Tamagochi  
+- 🕹️ **Mini-Games** – earn points and rewards to keep your pet happy  
+- 🗂️ **Persistent Data** – Cloudflare KV / D1 integration for saving progress  
+- 🎨 **Custom Skins** – personalize your pet with different looks  
+- 🌐 **Cloudflare-Native Hosting** – fast, reliable, and globally distributed  
+
+---
+
+## 🛠️ Technology Stack
+
+- **Frontend:** Next.js (React + TailwindCSS)  
+- **Platform:** Cloudflare Pages + Workers  
+- **Database:** D1 (planned)  
+- **Storage:** R2 (for images & assets, planned)  
+- **KV:** Session and pet state persistence  
+
+---
+
+## 🚀 Development
+
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
+````
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## ☁️ Deployment
+
+Build and deploy with Wrangler:
+
+```bash
+pnpm run deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Before deployment, make sure to configure secrets and bindings (KV, D1, R2)
+via the [Cloudflare Dashboard](https://dash.cloudflare.com).
 
-## Cloudflare integration
+---
 
-Besides the `dev` script mentioned above `c3` has added a few extra scripts that allow you to integrate the application with the [Cloudflare Pages](https://pages.cloudflare.com/) environment, these are:
-  - `pages:build` to build the application for Pages using the [`@cloudflare/next-on-pages`](https://github.com/cloudflare/next-on-pages) CLI
-  - `preview` to locally preview your Pages application using the [Wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI
-  - `deploy` to deploy your Pages application using the [Wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI
+## 📅 Current Status
 
-> __Note:__ while the `dev` script is optimal for local development you should preview your Pages application as well (periodically or before deployments) in order to make sure that it can properly work in the Pages environment (for more details see the [`@cloudflare/next-on-pages` recommended workflow](https://github.com/cloudflare/next-on-pages/blob/main/internal-packages/next-dev/README.md#recommended-development-workflow))
+🚧 **Prototype Stage** – basic setup with Next.js and Cloudflare integration.
+The gameplay logic (pet simulation, state persistence) is under development.
 
-### Bindings
+---
 
-Cloudflare [Bindings](https://developers.cloudflare.com/pages/functions/bindings/) are what allows you to interact with resources available in the Cloudflare Platform.
+## 📌 Roadmap
 
-You can use bindings during development, when previewing locally your application and of course in the deployed application:
+* [ ] Core pet simulation (feed, sleep, play)
+* [ ] Persistent storage with KV or D1
+* [ ] Mini-games integration
+* [ ] Custom skins / themes
+* [ ] Leaderboards & community features
 
-- To use bindings in dev mode you need to define them in the `next.config.js` file under `setupDevBindings`, this mode uses the `next-dev` `@cloudflare/next-on-pages` submodule. For more details see its [documentation](https://github.com/cloudflare/next-on-pages/blob/05b6256/internal-packages/next-dev/README.md).
+---
 
-- To use bindings in the preview mode you need to add them to the `pages:preview` script accordingly to the `wrangler pages dev` command. For more details see its [documentation](https://developers.cloudflare.com/workers/wrangler/commands/#dev-1) or the [Pages Bindings documentation](https://developers.cloudflare.com/pages/functions/bindings/).
+## 🌍 Part of the HSWLP Ecosystem
 
-- To use bindings in the deployed application you will need to configure them in the Cloudflare [dashboard](https://dash.cloudflare.com/). For more details see the  [Pages Bindings documentation](https://developers.cloudflare.com/pages/functions/bindings/).
+Tamagochi App is one of several experimental projects within
+the **HSWLP (Hybrid Service Workflow Launch Platform)** initiative,
+exploring how Cloudflare-native applications can power creative SaaS tools.
 
-#### KV Example
+Other projects include:
 
-`c3` has added for you an example showing how you can use a KV binding.
+* **Yume** – music & image sharing
+* **IdeaBoard** – idea voting & collaboration
+* **HSWLP\:Talk** – video conferencing
+* **PlayCore** – game server hosting dashboard
 
-In order to enable the example:
-- Search for javascript/typescript lines containing the following comment:
-  ```ts
-  // KV Example:
-  ```
-  and uncomment the commented lines below it.
-- Do the same in the `wrangler.toml` file, where
-  the comment is:
-  ```
-  # KV Example:
-  ```
-- If you're using TypeScript run the `cf-typegen` script to update the `env.d.ts` file:
-  ```bash
-  npm run cf-typegen
-  # or
-  yarn cf-typegen
-  # or
-  pnpm cf-typegen
-  # or
-  bun cf-typegen
-  ```
+---
 
-After doing this you can run the `dev` or `preview` script and visit the `/api/hello` route to see the example in action.
+## 📜 License
 
-Finally, if you also want to see the example work in the deployed application make sure to add a `MY_KV_NAMESPACE` binding to your Pages application in its [dashboard kv bindings settings section](https://dash.cloudflare.com/?to=/:account/pages/view/:pages-project/settings/functions#kv_namespace_bindings_section). After having configured it make sure to re-deploy your application.
+Released under the **MIT License**.
+
+---
+
+**Tamagochi App** reimagines the nostalgic virtual pet as a
+**modern, serverless web experience** for the Cloudflare era.
+
