@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Retro Tamagochi kaland",
+  title: "Retro Tamagochi – Digitális kedvenc gondozó",
   description:
-    "Nevezd el a digitális kedvencedet, gondozd és játssz vele a böngészőben.",
+    "Nevezd el a digitális kedvencedet, figyeld a hangulatát, és élvezd a retró minijátékokat a böngésződből.",
 };
 
 export default function RootLayout({
