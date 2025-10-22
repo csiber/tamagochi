@@ -37,6 +37,40 @@ interface TamagochiInfo {
   createdAt: string;
 }
 
+type PetAnimation = "idle" | "eat" | "play" | "sleep" | "alert";
+type GameType = "reflex" | "hangulat" | "kincs";
+
+type StatChanges = Partial<{ hunger: number; energy: number; happiness: number }>;
+
+interface PersistedState {
+  profileName: string;
+  selectedMood: string;
+  tamagotchiStats: { hunger: number; energy: number; happiness: number };
+  careStats: { meals: number; plays: number; rests: number };
+  activityLog: ActivityItem[];
+  reflexBest: number | null;
+  moodScore: number;
+  treasureBest: number;
+}
+
+interface MoodChallenge {
+  targetId: string;
+  description: string;
+  options: MoodOption[];
+}
+
+interface TreasureState {
+  treasureIndex: number;
+  attempts: number;
+  discovered: number[];
+  message: string;
+  found: boolean;
+}
+
+const STORAGE_KEY = "tamagochi-state-v1";
+const TREASURE_GRID_SIZE = 9;
+const TREASURE_ATTEMPTS = 4;
+
 const MAX_LOG_ITEMS = 7;
 const INITIAL_STATUS = "A tamagochi kíváncsian pislog a világra.";
 
@@ -86,6 +120,59 @@ const initialActivity: ActivityItem[] = [
     id: 3,
     message: "A tamagochi megfigyelte a neonfényű eget.",
     timeAgo: "nemrég",
+  },
+];
+
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+const shuffleArray = <T,>(items: T[]) => {
+  const clone = [...items];
+  for (let index = clone.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(0, index);
+    [clone[index], clone[swapIndex]] = [clone[swapIndex]!, clone[index]!];
+  }
+  return clone;
+};
+
+const createMoodChallenge = (): MoodChallenge => {
+  const shuffled = shuffleArray(moodOptions);
+  const target = shuffled[randomInt(0, shuffled.length - 1)] ?? moodOptions[0]!;
+  return {
+    targetId: target.id,
+    description: target.description,
+    options: shuffled,
+  };
+};
+
+const createTreasureState = (): TreasureState => ({
+  treasureIndex: randomInt(0, TREASURE_GRID_SIZE - 1),
+  attempts: TREASURE_ATTEMPTS,
+  discovered: [],
+  message: "Kattints egy pixelre, találd meg az elrejtett ajándékot!",
+  found: false,
+});
+
+const miniGames: { id: GameType; title: string; description: string; icon: string; accent: string }[] = [
+  {
+    id: "reflex",
+    title: "Reflex villanás",
+    description: "Várd meg, míg felvillan a kijelző és csapj le villámgyorsan!",
+    icon: "⚡",
+    accent: "from-emerald-400/70 to-sky-500/60",
+  },
+  {
+    id: "hangulat",
+    title: "Hangulat kvíz",
+    description: "Találd ki, melyik hangulathoz tartozik a leírás.",
+    icon: "🎯",
+    accent: "from-fuchsia-400/70 to-purple-500/60",
+  },
+  {
+    id: "kincs",
+    title: "Pixel kincsvadászat",
+    description: "Vadássz a meglepetésekre egy 3x3-as rácsban!",
+    icon: "💎",
+    accent: "from-amber-400/70 to-rose-500/60",
   },
 ];
 
@@ -201,6 +288,31 @@ export default function Home() {
   });
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivity);
 
+  const [petAnimation, setPetAnimation] = useState<PetAnimation>("idle");
+  const animationTimeoutRef = useRef<number | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  const [activeGame, setActiveGame] = useState<GameType | null>(null);
+  const [gameSessionKey, setGameSessionKey] = useState(0);
+
+  const [reflexStatus, setReflexStatus] = useState<"idle" | "waiting" | "ready" | "success" | "fail">("idle");
+  const [reflexMessage, setReflexMessage] = useState<string>("Készen állsz a reflex próbára?");
+  const [reflexBest, setReflexBest] = useState<number | null>(null);
+  const [reflexLast, setReflexLast] = useState<number | null>(null);
+  const reflexTimeoutRef = useRef<number | null>(null);
+  const reflexStartRef = useRef<number | null>(null);
+
+  const [moodChallenge, setMoodChallenge] = useState<MoodChallenge>(() => createMoodChallenge());
+  const [moodFeedback, setMoodFeedback] = useState<string>("Találd ki a hangulatot a leírás alapján!");
+  const [moodLocked, setMoodLocked] = useState(false);
+  const [moodScore, setMoodScore] = useState(0);
+  const moodTimeoutRef = useRef<number | null>(null);
+
+  const [treasureState, setTreasureState] = useState<TreasureState>(() => createTreasureState());
+  const [treasureStreak, setTreasureStreak] = useState(0);
+  const [treasureBest, setTreasureBest] = useState(0);
+  const treasureTimeoutRef = useRef<number | null>(null);
+
   const [tamagotchis, setTamagotchis] = useState<TamagochiInfo[]>([]);
   const [tamagotchiError, setTamagotchiError] = useState<string | null>(null);
   const [isLoadingTamagotchis, setIsLoadingTamagotchis] = useState(true);
@@ -225,6 +337,243 @@ export default function Home() {
     },
     [],
   );
+
+  const triggerAnimation = useCallback(
+    (animation: PetAnimation, duration = 2000) => {
+      if (animationTimeoutRef.current) {
+        window.clearTimeout(animationTimeoutRef.current);
+      }
+
+      setPetAnimation(animation);
+      animationTimeoutRef.current = window.setTimeout(() => {
+        setPetAnimation("idle");
+        animationTimeoutRef.current = null;
+      }, duration);
+    },
+    [],
+  );
+
+  const handleGameSuccess = useCallback(
+    (message: string, overrides?: StatChanges) => {
+      const defaultChanges: StatChanges = { happiness: 14, energy: -6, hunger: -4 };
+      const finalChanges = { ...defaultChanges, ...overrides };
+      applyStatChanges(finalChanges);
+      setCareStats((previous) => ({
+        ...previous,
+        plays: previous.plays + 1,
+      }));
+      addActivity(message);
+      triggerAnimation("play", 2200);
+    },
+    [addActivity, applyStatChanges, triggerAnimation],
+  );
+
+  const handleGameMistake = useCallback(
+    (message: string, penalty?: StatChanges) => {
+      const defaultPenalty: StatChanges = { happiness: -4 };
+      const finalPenalty = { ...defaultPenalty, ...penalty };
+      applyStatChanges(finalPenalty);
+      addActivity(message);
+      triggerAnimation("alert", 2000);
+    },
+    [addActivity, applyStatChanges, triggerAnimation],
+  );
+
+  const clearReflexTimeout = useCallback(() => {
+    if (reflexTimeoutRef.current) {
+      window.clearTimeout(reflexTimeoutRef.current);
+      reflexTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearMoodTimeout = useCallback(() => {
+    if (moodTimeoutRef.current) {
+      window.clearTimeout(moodTimeoutRef.current);
+      moodTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearTreasureTimeout = useCallback(() => {
+    if (treasureTimeoutRef.current) {
+      window.clearTimeout(treasureTimeoutRef.current);
+      treasureTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startReflexRound = useCallback(() => {
+    clearReflexTimeout();
+    reflexStartRef.current = null;
+    setReflexStatus("waiting");
+    setReflexMessage("Figyeld a kijelzőt, hamarosan felvillan a fény!");
+    const delay = randomInt(1200, 4000);
+    reflexTimeoutRef.current = window.setTimeout(() => {
+      reflexStartRef.current = performance.now();
+      setReflexStatus("ready");
+      setReflexMessage("Most! Csapj le a gombra!");
+    }, delay);
+  }, [clearReflexTimeout]);
+
+  const startMoodChallenge = useCallback(() => {
+    clearMoodTimeout();
+    setMoodChallenge(createMoodChallenge());
+    setMoodFeedback("Találd ki a hangulatot a leírás alapján!");
+    setMoodLocked(false);
+  }, [clearMoodTimeout]);
+
+  const startTreasureRound = useCallback(() => {
+    clearTreasureTimeout();
+    setTreasureState(createTreasureState());
+  }, [clearTreasureTimeout]);
+
+  const handleSelectGame = (gameId: GameType) => {
+    if (activeGame === gameId) {
+      const selected = miniGames.find((game) => game.id === gameId);
+      if (selected) {
+        addActivity(`Bezártad a ${selected.title.toLowerCase()} mini-játékot.`);
+      }
+      setActiveGame(null);
+      clearReflexTimeout();
+      clearMoodTimeout();
+      clearTreasureTimeout();
+      return;
+    }
+
+    const selected = miniGames.find((game) => game.id === gameId);
+    if (selected) {
+      addActivity(`Mini-játék indult: ${selected.title}.`);
+    }
+
+    setGameSessionKey((value) => value + 1);
+    setActiveGame(gameId);
+    triggerAnimation("play", 1500);
+
+    clearReflexTimeout();
+    clearMoodTimeout();
+    clearTreasureTimeout();
+
+    if (gameId === "reflex") {
+      reflexStartRef.current = null;
+      setReflexStatus("idle");
+      setReflexMessage("Készen állsz a reflex próbára?");
+    } else if (gameId === "hangulat") {
+      startMoodChallenge();
+    } else if (gameId === "kincs") {
+      startTreasureRound();
+    }
+  };
+
+  const handleReflexPress = () => {
+    if (reflexStatus === "idle" || reflexStatus === "success" || reflexStatus === "fail") {
+      startReflexRound();
+      return;
+    }
+
+    if (reflexStatus === "waiting") {
+      clearReflexTimeout();
+      reflexStartRef.current = null;
+      setReflexStatus("fail");
+      setReflexMessage("Túl korán kattintottál! Várd meg, míg felvillan a kijelző.");
+      handleGameMistake("Elkapkodtad a reflex játékot.", { happiness: -2 });
+      return;
+    }
+
+    if (reflexStatus === "ready" && reflexStartRef.current !== null) {
+      const reaction = Math.max(0, Math.round(performance.now() - reflexStartRef.current));
+      setReflexLast(reaction);
+      setReflexMessage(`Villámgyors voltál: ${reaction} ms! Új körhöz kattints ismét.`);
+      setReflexStatus("success");
+      setReflexBest((previous) => (previous === null ? reaction : Math.min(previous, reaction)));
+      reflexStartRef.current = null;
+      handleGameSuccess("Rekord reakcióidő a reflex mini-játékban!", { energy: -5, happiness: 18 });
+    }
+  };
+
+  const resetReflexScores = () => {
+    clearReflexTimeout();
+    reflexStartRef.current = null;
+    setReflexBest(null);
+    setReflexLast(null);
+    setReflexStatus("idle");
+    setReflexMessage("Rekord lenullázva. Készen állsz egy új körre?");
+  };
+
+  const handleMoodGuess = (moodId: string) => {
+    if (moodLocked) {
+      return;
+    }
+
+    if (moodId === moodChallenge.targetId) {
+      setMoodLocked(true);
+      setMoodScore((previous) => previous + 1);
+      const matchedMood = moodOptions.find((option) => option.id === moodId);
+      setMoodFeedback(`Talált! Ez bizony a ${matchedMood?.label ?? "hangulat"} hangulat.`);
+      handleGameSuccess("Ügyesen megoldottad a hangulat kvízt!", { happiness: 12, energy: -3, hunger: -2 });
+      clearMoodTimeout();
+      moodTimeoutRef.current = window.setTimeout(() => {
+        startMoodChallenge();
+      }, 1500);
+      return;
+    }
+
+    setMoodFeedback("Ez most nem volt telitalálat, próbáld újra!");
+    handleGameMistake("Eltévesztetted a hangulatot a mini-játékban.", { happiness: -2 });
+  };
+
+  const handleTreasureChoice = (index: number) => {
+    if (treasureState.found || treasureState.discovered.includes(index)) {
+      return;
+    }
+
+    if (index === treasureState.treasureIndex) {
+      const newDiscovered = [...treasureState.discovered, index];
+      setTreasureState({
+        treasureIndex: treasureState.treasureIndex,
+        attempts: treasureState.attempts,
+        discovered: newDiscovered,
+        message: "Megtaláltad a neon kincset! Új kör indul pillanatokon belül.",
+        found: true,
+      });
+      setTreasureStreak((previous) => {
+        const updated = previous + 1;
+        setTreasureBest((best) => Math.max(best, updated));
+        return updated;
+      });
+      handleGameSuccess("Pixel kincsvadászat sikeresen teljesítve!", { happiness: 16, energy: -5, hunger: -3 });
+      clearTreasureTimeout();
+      treasureTimeoutRef.current = window.setTimeout(() => {
+        startTreasureRound();
+      }, 1600);
+      return;
+    }
+
+    const remainingAttempts = treasureState.attempts - 1;
+    const newDiscovered = [...treasureState.discovered, index];
+
+    if (remainingAttempts <= 0) {
+      setTreasureState({
+        treasureIndex: treasureState.treasureIndex,
+        attempts: 0,
+        discovered: newDiscovered,
+        message: "Elfogytak a próbálkozások, mindjárt új kör indul.",
+        found: false,
+      });
+      setTreasureStreak(0);
+      handleGameMistake("A kincs most elbújt előled.", { happiness: -3, energy: -2 });
+      clearTreasureTimeout();
+      treasureTimeoutRef.current = window.setTimeout(() => {
+        startTreasureRound();
+      }, 1600);
+      return;
+    }
+
+    setTreasureState({
+      treasureIndex: treasureState.treasureIndex,
+      attempts: remainingAttempts,
+      discovered: newDiscovered,
+      message: "Ez a pixel üres volt, próbálkozz tovább!",
+      found: false,
+    });
+  };
 
   const refreshTamagotchis = useCallback(async () => {
     setIsLoadingTamagotchis(true);
@@ -254,6 +603,97 @@ export default function Home() {
       setIsLoadingTamagotchis(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+
+      if (!stored) {
+        setIsHydrated(true);
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as Partial<PersistedState>;
+
+      if (parsed.selectedMood) {
+        setSelectedMood(parsed.selectedMood);
+      }
+
+      if (parsed.tamagotchiStats) {
+        setTamagotchiStats({
+          hunger: clamp(parsed.tamagotchiStats.hunger ?? 0),
+          energy: clamp(parsed.tamagotchiStats.energy ?? 0),
+          happiness: clamp(parsed.tamagotchiStats.happiness ?? 0),
+        });
+      }
+
+      if (parsed.careStats) {
+        setCareStats({
+          meals: parsed.careStats.meals ?? 0,
+          plays: parsed.careStats.plays ?? 0,
+          rests: parsed.careStats.rests ?? 0,
+        });
+      }
+
+      if (Array.isArray(parsed.activityLog) && parsed.activityLog.length > 0) {
+        setActivityLog(parsed.activityLog.slice(0, MAX_LOG_ITEMS));
+      }
+
+      if (typeof parsed.profileName === "string" && parsed.profileName.trim().length > 0) {
+        setProfileName(parsed.profileName);
+        setNameInput(parsed.profileName);
+      }
+
+      if (typeof parsed.reflexBest === "number") {
+        setReflexBest(parsed.reflexBest);
+      }
+
+      if (typeof parsed.moodScore === "number") {
+        setMoodScore(parsed.moodScore);
+      }
+
+      if (typeof parsed.treasureBest === "number") {
+        setTreasureBest(parsed.treasureBest);
+      }
+    } catch (error) {
+      console.error("Nem sikerült betölteni a helyi tamagochi állapotot", error);
+    } finally {
+      setIsHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated || typeof window === "undefined") {
+      return;
+    }
+
+    const payload: PersistedState = {
+      profileName,
+      selectedMood,
+      tamagotchiStats,
+      careStats,
+      activityLog: activityLog.slice(0, MAX_LOG_ITEMS),
+      reflexBest,
+      moodScore,
+      treasureBest,
+    };
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }, [
+    activityLog,
+    careStats,
+    isHydrated,
+    moodScore,
+    profileName,
+    selectedMood,
+    tamagotchiStats,
+    reflexBest,
+    treasureBest,
+  ]);
 
   useEffect(() => {
     const fetchStoredName = async () => {
@@ -291,6 +731,19 @@ export default function Home() {
 
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (animationTimeoutRef.current) {
+        window.clearTimeout(animationTimeoutRef.current);
+      }
+
+      clearReflexTimeout();
+      clearMoodTimeout();
+      clearTreasureTimeout();
+    },
+    [clearMoodTimeout, clearReflexTimeout, clearTreasureTimeout],
+  );
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -361,8 +814,17 @@ export default function Home() {
       warningRef.current.happiness = false;
     }
 
-    warnings.forEach((warning) => addActivity(warning));
-  }, [addActivity, tamagotchiStats.energy, tamagotchiStats.happiness, tamagotchiStats.hunger]);
+    if (warnings.length > 0) {
+      warnings.forEach((warning) => addActivity(warning));
+      triggerAnimation("alert", 2200);
+    }
+  }, [
+    addActivity,
+    tamagotchiStats.energy,
+    tamagotchiStats.happiness,
+    tamagotchiStats.hunger,
+    triggerAnimation,
+  ]);
 
   const handleNameInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setNameInput(event.target.value);
@@ -469,6 +931,7 @@ export default function Home() {
 
     const selected = moodOptions.find((option) => option.id === moodId);
     setSelectedMood(moodId);
+    triggerAnimation("alert", 1400);
 
     if (selected) {
       addActivity(`Hangulat mód: ${selected.label}.`);
@@ -484,6 +947,7 @@ export default function Home() {
       meals: previous.meals + 1,
     }));
     addActivity("Finom pixel-ebédet kapott a tamagochi.");
+    triggerAnimation("eat", 1900);
   };
 
   const handlePlay = () => {
@@ -495,6 +959,7 @@ export default function Home() {
       plays: previous.plays + 1,
     }));
     addActivity("Játékra hívtad a tamagochit.");
+    triggerAnimation("play", 2000);
   };
 
   const handleRest = () => {
@@ -505,6 +970,7 @@ export default function Home() {
       rests: previous.rests + 1,
     }));
     addActivity("Lefektetted egy kis pihenésre.");
+    triggerAnimation("sleep", 2600);
   };
 
   const selectedMoodOption = useMemo(
@@ -546,6 +1012,16 @@ export default function Home() {
     [profileName, tamagotchis],
   );
 
+  const activeGameDefinition = useMemo(
+    () => (activeGame ? miniGames.find((game) => game.id === activeGame) ?? null : null),
+    [activeGame],
+  );
+
+  const treasureCells = useMemo(
+    () => Array.from({ length: TREASURE_GRID_SIZE }, (_, index) => index),
+    [],
+  );
+
   const statItems = useMemo(
     () => [
       {
@@ -572,6 +1048,109 @@ export default function Home() {
     ],
     [tamagotchiStats.energy, tamagotchiStats.happiness, tamagotchiStats.hunger],
   );
+
+  const renderActiveGameContent = () => {
+    switch (activeGame) {
+      case "reflex":
+        return (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-300">{reflexMessage}</p>
+            <button
+              type="button"
+              onClick={handleReflexPress}
+              className={`h-28 w-full rounded-2xl border-2 border-emerald-400/40 text-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-400/60 ${
+                reflexStatus === "ready"
+                  ? "animate-pulse bg-emerald-500/30 text-emerald-100"
+                  : reflexStatus === "waiting"
+                    ? "bg-slate-800/60 text-slate-200"
+                    : "bg-slate-900/70 text-slate-200 hover:bg-slate-900"
+              }`}
+            >
+              {reflexStatus === "ready"
+                ? "Csapj le most!"
+                : reflexStatus === "waiting"
+                  ? "Várakozás..."
+                  : "Indítsd a próbatételt"}
+            </button>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <span>Utolsó reakció: {reflexLast != null ? `${reflexLast} ms` : "—"}</span>
+              <span>Legjobb idő: {reflexBest != null ? `${reflexBest} ms` : "—"}</span>
+              <button
+                type="button"
+                onClick={resetReflexScores}
+                className="rounded-xl border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-emerald-300/60 hover:text-emerald-200"
+              >
+                Rekord nullázása
+              </button>
+            </div>
+          </div>
+        );
+      case "hangulat":
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-300">{moodFeedback}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {moodChallenge.options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => handleMoodGuess(option.id)}
+                  className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-400/60 ${
+                    option.id === moodChallenge.targetId && moodLocked
+                      ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
+                      : "border-slate-700 bg-slate-900/60 text-slate-200 hover:border-emerald-300/50 hover:text-emerald-100"
+                  }`}
+                  disabled={moodLocked}
+                >
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden>{option.emoji}</span>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-slate-400">
+              Eddigi helyes válaszok: <span className="font-semibold text-emerald-200">{moodScore}</span>
+            </div>
+          </div>
+        );
+      case "kincs":
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-300">{treasureState.message}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {treasureCells.map((cell) => {
+                const isFound = treasureState.found && cell === treasureState.treasureIndex;
+                const isDiscovered = treasureState.discovered.includes(cell);
+                return (
+                  <button
+                    key={cell}
+                    type="button"
+                    onClick={() => handleTreasureChoice(cell)}
+                    className={`aspect-square rounded-xl border text-xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/60 ${
+                      isFound
+                        ? "border-emerald-400 bg-emerald-500/30 text-emerald-100"
+                        : isDiscovered
+                          ? "border-slate-700 bg-slate-900/60 text-slate-500"
+                          : "border-slate-700 bg-slate-950/50 text-slate-600 hover:border-emerald-300/60 hover:text-emerald-200"
+                    }`}
+                  >
+                    {isFound ? "✨" : isDiscovered ? "·" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <span>Hátralévő próbálkozások: {treasureState.attempts}</span>
+              <span>Aktuális széria: {treasureStreak}</span>
+              <span>Legjobb széria: {treasureBest}</span>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -701,10 +1280,10 @@ export default function Home() {
                   aria-hidden
                 >
                   <div className="tamagochi-screen">
-                    <div className="tamagochi-pet">
-                      <span className="tamagochi-eye" />
-                      <span className="tamagochi-eye" />
-                      <span className="tamagochi-mouth" />
+                    <div className="tamagochi-pet" data-animation={petAnimation}>
+                      <span className="tamagochi-eye" data-side="left" />
+                      <span className="tamagochi-eye" data-side="right" />
+                      <span className="tamagochi-mouth" data-animation={petAnimation} />
                     </div>
                   </div>
                 </div>
@@ -770,6 +1349,63 @@ export default function Home() {
                   <div className="rounded-2xl border border-teal-400/30 bg-slate-900/40 p-3">
                     <p className="font-semibold text-slate-100">Pihenések</p>
                     <p className="text-lg font-semibold text-teal-200">{careStats.rests}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-emerald-400/30 bg-slate-900/40 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                        Mini-játékok
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        Mozgasd át a tamagochit változatos kihívásokkal és gyűjts rekordokat!
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+                      <span>Reflex rekord: {reflexBest != null ? `${reflexBest} ms` : "—"}</span>
+                      <span>Hangulat pont: {moodScore}</span>
+                      <span>Leghosszabb kincs-széria: {treasureBest}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {miniGames.map((game) => (
+                      <button
+                        key={game.id}
+                        type="button"
+                        onClick={() => handleSelectGame(game.id)}
+                        className={`rounded-2xl border border-slate-800/70 bg-slate-900/40 p-3 text-left text-sm font-semibold text-slate-100 transition hover:border-emerald-300/60 hover:bg-slate-900/60 ${
+                          activeGame === game.id ? "ring-2 ring-emerald-400/60" : ""
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span aria-hidden className="text-lg">
+                            {game.icon}
+                          </span>
+                          {game.title}
+                        </span>
+                        <span className="mt-2 block text-xs font-normal text-slate-400">
+                          {game.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-4">
+                    {activeGameDefinition ? (
+                      <div key={`${activeGameDefinition.id}-${gameSessionKey}`} className="space-y-4">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
+                          <span aria-hidden>{activeGameDefinition.icon}</span>
+                          {activeGameDefinition.title}
+                        </h4>
+                        {renderActiveGameContent()}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">
+                        Válassz egy mini-játékot a fenti listából, és a tamagochi azonnal reagál a mozdulataidra.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
