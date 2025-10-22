@@ -30,8 +30,15 @@ interface MoodOption {
 interface ActivityItem {
   id: number;
   message: string;
-  timeAgo: string;
+  createdAt: string;
 }
+
+type ActivityItemLike = {
+  id?: unknown;
+  message?: unknown;
+  createdAt?: unknown;
+  timeAgo?: unknown;
+};
 
 interface TamagochiInfo {
   name: string;
@@ -73,6 +80,7 @@ const TREASURE_GRID_SIZE = 9;
 const TREASURE_ATTEMPTS = 4;
 
 const MAX_LOG_ITEMS = 7;
+const ACTIVITY_FALLBACK_INTERVAL = 120_000;
 const INITIAL_STATUS = "A tamagochi kíváncsian pislog a világra.";
 
 const moodOptions: MoodOption[] = [
@@ -106,23 +114,60 @@ const moodOptions: MoodOption[] = [
   },
 ];
 
+const initialActivitySeed = Date.now();
 const initialActivity: ActivityItem[] = [
   {
-    id: 1,
+    id: initialActivitySeed,
     message: "A tojás megrepedt és egy kíváncsi tamagochi bukkant elő!",
-    timeAgo: "néhány perce",
+    createdAt: new Date(initialActivitySeed - 6 * 60_000).toISOString(),
   },
   {
-    id: 2,
+    id: initialActivitySeed - 1,
     message: "Megsimogattad a pixel bundáját.",
-    timeAgo: "nemrég",
+    createdAt: new Date(initialActivitySeed - 4 * 60_000).toISOString(),
   },
   {
-    id: 3,
+    id: initialActivitySeed - 2,
     message: "A tamagochi megfigyelte a neonfényű eget.",
-    timeAgo: "nemrég",
+    createdAt: new Date(initialActivitySeed - 2 * 60_000).toISOString(),
   },
 ];
+
+const normaliseActivityLog = (value: unknown): ActivityItem[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const now = Date.now();
+
+  return (value as ActivityItemLike[])
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const candidate = entry as ActivityItemLike;
+
+      if (typeof candidate.message !== "string" || candidate.message.trim().length === 0) {
+        return null;
+      }
+
+      const id = typeof candidate.id === "number" ? candidate.id : now - index;
+      const message = candidate.message.trim();
+
+      if (typeof candidate.createdAt === "string") {
+        const parsed = Date.parse(candidate.createdAt);
+        if (!Number.isNaN(parsed)) {
+          return { id, message, createdAt: new Date(parsed).toISOString() } satisfies ActivityItem;
+        }
+      }
+
+      const fallbackDate = new Date(now - index * ACTIVITY_FALLBACK_INTERVAL).toISOString();
+      return { id, message, createdAt: fallbackDate } satisfies ActivityItem;
+    })
+    .filter((item): item is ActivityItem => item !== null)
+    .slice(0, MAX_LOG_ITEMS);
+};
 
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -324,10 +369,14 @@ export default function Home() {
   const warningRef = useRef({ hunger: false, energy: false, happiness: false });
 
   const addActivity = useCallback((message: string) => {
-    setActivityLog((prev) => [
-      { id: Date.now(), message, timeAgo: "épp most" },
-      ...prev.slice(0, MAX_LOG_ITEMS - 1),
-    ]);
+    const entry: ActivityItem = {
+      id: Date.now(),
+      message,
+      createdAt: new Date().toISOString(),
+    };
+
+    setActivityLog((prev) => [entry, ...prev.slice(0, MAX_LOG_ITEMS - 1)]);
+    setNowTimestamp(Date.now());
   }, []);
 
   const applyStatChanges = useCallback(
@@ -601,13 +650,14 @@ export default function Home() {
       }
 
       setTamagotchis(data.tamagotchis);
+      setNowTimestamp(Date.now());
     } catch (error) {
       console.error("Nem sikerült frissíteni a tamagochi listát", error);
       setTamagotchiError("Nem sikerült betölteni a tamagochi társakat.");
     } finally {
       setIsLoadingTamagotchis(false);
     }
-  }, []);
+  }, [setNowTimestamp]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -645,7 +695,10 @@ export default function Home() {
       }
 
       if (Array.isArray(parsed.activityLog) && parsed.activityLog.length > 0) {
-        setActivityLog(parsed.activityLog.slice(0, MAX_LOG_ITEMS));
+        const normalisedLog = normaliseActivityLog(parsed.activityLog);
+        if (normalisedLog.length > 0) {
+          setActivityLog(normalisedLog);
+        }
       }
 
       if (typeof parsed.profileName === "string" && parsed.profileName.trim().length > 0) {
@@ -667,6 +720,7 @@ export default function Home() {
     } catch (error) {
       console.error("Nem sikerült betölteni a helyi tamagochi állapotot", error);
     } finally {
+      setNowTimestamp(Date.now());
       setIsHydrated(true);
     }
   }, []);
@@ -730,12 +784,24 @@ export default function Home() {
   }, [refreshTamagotchis]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
     const interval = window.setInterval(() => {
-      setNowTimestamp(Date.now());
-    }, 60_000);
+      void refreshTamagotchis();
+    }, 45_000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [refreshTamagotchis]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 15_000);
+
+    return () => window.clearInterval(interval);
+  }, [setNowTimestamp]);
 
   useEffect(
     () => () => {
@@ -1027,6 +1093,83 @@ export default function Home() {
     [profileName, tamagotchis],
   );
 
+  const renderedActivityLog = useMemo(
+    () =>
+      activityLog.map((item) => ({
+        ...item,
+        timeAgo: formatElapsedTime(item.createdAt, nowTimestamp),
+      })),
+    [activityLog, nowTimestamp],
+  );
+
+  const communitySummary = useMemo(() => {
+    if (tamagotchis.length === 0) {
+      return null;
+    }
+
+    const sorted = [...tamagotchis].sort(
+      (first, second) => Date.parse(first.createdAt) - Date.parse(second.createdAt),
+    );
+
+    return {
+      count: tamagotchis.length,
+      oldest: sorted[0] ?? null,
+      newest: sorted[sorted.length - 1] ?? null,
+    } as const;
+  }, [tamagotchis]);
+
+  const communityHighlights = useMemo(
+    () => {
+      if (!communitySummary) {
+        return [] as {
+          id: string;
+          label: string;
+          value: string;
+          subtitle?: string | null;
+          accent: string;
+        }[];
+      }
+
+      const highlights: {
+        id: string;
+        label: string;
+        value: string;
+        subtitle?: string | null;
+        accent: string;
+      }[] = [
+        {
+          id: "count",
+          label: "Összes lakó",
+          value: communitySummary.count.toString(),
+          accent: "from-emerald-400/60 to-teal-500/30",
+        },
+      ];
+
+      if (communitySummary.newest) {
+        highlights.push({
+          id: `newest-${communitySummary.newest.name}`,
+          label: "Friss érkező",
+          value: communitySummary.newest.name,
+          subtitle: formatElapsedTime(communitySummary.newest.createdAt, nowTimestamp),
+          accent: "from-sky-400/50 to-blue-500/20",
+        });
+      }
+
+      if (communitySummary.oldest) {
+        highlights.push({
+          id: `oldest-${communitySummary.oldest.name}`,
+          label: "Ős tag",
+          value: communitySummary.oldest.name,
+          subtitle: formatElapsedTime(communitySummary.oldest.createdAt, nowTimestamp),
+          accent: "from-amber-400/50 to-orange-500/30",
+        });
+      }
+
+      return highlights;
+    },
+    [communitySummary, nowTimestamp],
+  );
+
   const activeGameDefinition = useMemo(
     () => (activeGame ? miniGames.find((game) => game.id === activeGame) ?? null : null),
     [activeGame],
@@ -1170,7 +1313,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="community-gradient">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 lg:grid lg:grid-cols-[280px_1fr_320px] lg:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 lg:grid lg:grid-cols-[260px_1.35fr_320px] lg:px-6">
           <aside className="space-y-6">
             <section className="community-card space-y-6">
               <header className="flex items-center gap-4">
@@ -1288,7 +1431,14 @@ export default function Home() {
                     )}
                   </p>
                   <h1 className="text-2xl font-semibold text-slate-50">{displayName}</h1>
-                  <p className="text-sm text-slate-300">{tamagochiStatus}</p>
+                  <p
+                    className="text-sm text-slate-300"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {tamagochiStatus}
+                  </p>
                 </div>
                 <div
                   className={`tamagochi-orb bg-gradient-to-br ${selectedMoodOption.gradient}`}
@@ -1343,7 +1493,7 @@ export default function Home() {
                         </div>
                         <div className="h-3 rounded-full bg-slate-900/60">
                           <div
-                            className={`h-full rounded-full bg-gradient-to-r ${stat.accent}`}
+                            className={`h-full rounded-full bg-gradient-to-r ${stat.accent} transition-[width] duration-700 ease-out`}
                             style={{ width: `${safeValue}%` }}
                           />
                         </div>
@@ -1450,6 +1600,30 @@ export default function Home() {
               <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
                 Társ tamagochik
               </h3>
+              {communityHighlights.length > 0 && !isLoadingTamagotchis && !tamagotchiError && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {communityHighlights.map((highlight) => (
+                    <div
+                      key={highlight.id}
+                      className="relative overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3"
+                    >
+                      <div
+                        className={`pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br ${highlight.accent} opacity-40`}
+                        aria-hidden="true"
+                      />
+                      <div className="relative space-y-1">
+                        <p className="text-[0.65rem] uppercase tracking-[0.28em] text-slate-200">
+                          {highlight.label}
+                        </p>
+                        <p className="text-lg font-semibold text-emerald-100">{highlight.value}</p>
+                        {highlight.subtitle ? (
+                          <p className="text-xs text-slate-300">Aktivitás: {highlight.subtitle}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {isLoadingTamagotchis ? (
                 <p className="text-sm text-slate-400">Betöltés alatt...</p>
               ) : tamagotchiError ? (
@@ -1485,7 +1659,7 @@ export default function Home() {
                 Napló
               </h3>
               <ul className="space-y-3 text-sm text-slate-300">
-                {activityLog.map((item) => (
+                {renderedActivityLog.map((item) => (
                   <li
                     key={item.id}
                     className="rounded-2xl border border-slate-800/70 bg-slate-900/30 p-3"

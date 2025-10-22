@@ -10,6 +10,10 @@ type TamagochiRecordLike = {
   createdAt?: unknown;
 };
 
+export interface TamagochiBindings {
+  TAMAGOCHI_KV: KVNamespace;
+}
+
 const normaliseName = (value: string) => value.trim();
 
 const comparisonKey = (value: string) =>
@@ -80,95 +84,162 @@ const parseDefaultRecords = (): TamagochiRecord[] => {
 
 const DEFAULT_TAMAGOTCHIS = parseDefaultRecords();
 
-const STORAGE_KEY = "__tamagochi_state__" as const;
+const MEMORY_STORAGE_KEY = "__tamagochi_memory_state__" as const;
+const KV_STORAGE_KEY = "tamagochi:records" as const;
 
-type GlobalTamagochiState = {
-  records: TamagochiRecord[];
-};
-
-type GlobalTamagochiScope = typeof globalThis & {
-  [STORAGE_KEY]?: GlobalTamagochiState;
+type MemoryScope = typeof globalThis & {
+  [MEMORY_STORAGE_KEY]?: TamagochiRecord[];
 };
 
 const cloneRecords = (records: TamagochiRecord[]): TamagochiRecord[] =>
   records.map((record) => ({ ...record }));
 
-const getGlobalScope = () => globalThis as GlobalTamagochiScope;
+const getMemoryScope = () => globalThis as MemoryScope;
 
-const ensureState = (): GlobalTamagochiState => {
-  const scope = getGlobalScope();
+const readFromMemory = (): TamagochiRecord[] => {
+  const scope = getMemoryScope();
 
-  if (!scope[STORAGE_KEY]) {
-    scope[STORAGE_KEY] = {
-      records: cloneRecords(DEFAULT_TAMAGOTCHIS),
-    };
-
-    return scope[STORAGE_KEY]!;
-  }
-
-  const sanitised = sanitiseRecords(scope[STORAGE_KEY]!.records);
-
-  if (sanitised.length === 0) {
-    scope[STORAGE_KEY]!.records = cloneRecords(DEFAULT_TAMAGOTCHIS);
+  if (!scope[MEMORY_STORAGE_KEY]) {
+    scope[MEMORY_STORAGE_KEY] = cloneRecords(DEFAULT_TAMAGOTCHIS);
   } else {
-    scope[STORAGE_KEY]!.records = sanitised;
+    const sanitised = sanitiseRecords(scope[MEMORY_STORAGE_KEY]!);
+    scope[MEMORY_STORAGE_KEY] =
+      sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
   }
 
-  return scope[STORAGE_KEY]!;
+  return cloneRecords(scope[MEMORY_STORAGE_KEY]!);
 };
 
-const commitRecords = (
+const writeToMemory = (
   records: Iterable<TamagochiRecordLike>,
 ): TamagochiRecord[] => {
   const sanitised = sanitiseRecords(records);
-  const scope = getGlobalScope();
-  const nextRecords =
-    sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
+  const scope = getMemoryScope();
+  const nextRecords = sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
 
-  scope[STORAGE_KEY] = { records: nextRecords };
+  scope[MEMORY_STORAGE_KEY] = nextRecords;
 
   return cloneRecords(nextRecords);
 };
 
-export const readTamagotchis = async (): Promise<TamagochiRecord[]> => {
-  const state = ensureState();
-  return cloneRecords(state.records);
+const readFromKv = async (
+  bindings: TamagochiBindings,
+): Promise<TamagochiRecord[]> => {
+  const stored = await bindings.TAMAGOCHI_KV.get<TamagochiRecordLike[]>(KV_STORAGE_KEY, {
+    type: "json",
+  });
+
+  if (!Array.isArray(stored)) {
+    const fallback = cloneRecords(DEFAULT_TAMAGOTCHIS);
+    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
+    return fallback;
+  }
+
+  const sanitised = sanitiseRecords(stored);
+
+  if (sanitised.length === 0) {
+    const fallback = cloneRecords(DEFAULT_TAMAGOTCHIS);
+    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
+    return fallback;
+  }
+
+  if (sanitised.length !== stored.length) {
+    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(sanitised));
+  }
+
+  return cloneRecords(sanitised);
 };
+
+const writeToKv = async (
+  records: Iterable<TamagochiRecordLike>,
+  bindings: TamagochiBindings,
+): Promise<TamagochiRecord[]> => {
+  const sanitised = sanitiseRecords(records);
+  const nextRecords = sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
+
+  await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(nextRecords));
+
+  return cloneRecords(nextRecords);
+};
+
+const resolveRecords = async (
+  bindings?: Partial<TamagochiBindings>,
+): Promise<TamagochiRecord[]> => {
+  if (bindings?.TAMAGOCHI_KV) {
+    return readFromKv(bindings as TamagochiBindings);
+  }
+
+  return readFromMemory();
+};
+
+const persistRecords = async (
+  records: Iterable<TamagochiRecordLike>,
+  bindings?: Partial<TamagochiBindings>,
+): Promise<TamagochiRecord[]> => {
+  if (bindings?.TAMAGOCHI_KV) {
+    return writeToKv(records, bindings as TamagochiBindings);
+  }
+
+  return writeToMemory(records);
+};
+
+export const readTamagotchis = async (
+  bindings?: Partial<TamagochiBindings>,
+): Promise<TamagochiRecord[]> => resolveRecords(bindings);
 
 export const registerTamagochi = async (
   name: string,
+  bindings?: Partial<TamagochiBindings>,
 ): Promise<TamagochiRecord[]> => {
   const trimmedName = normaliseName(name);
 
   if (!trimmedName) {
-    return readTamagotchis();
+    return resolveRecords(bindings);
   }
 
-  const state = ensureState();
-  const existingIndex = state.records.findIndex(
+  const records = await resolveRecords(bindings);
+  const existingIndex = records.findIndex(
     (record) => comparisonKey(record.name) === comparisonKey(trimmedName),
   );
 
   if (existingIndex >= 0) {
-    const existing = state.records[existingIndex]!;
+    const existing = records[existingIndex]!;
 
     if (existing.name === trimmedName) {
-      return cloneRecords(state.records);
+      return cloneRecords(records);
     }
 
-    const updatedRecords = state.records.map((record, index) =>
+    const updatedRecords = records.map((record, index) =>
       index === existingIndex ? { ...record, name: trimmedName } : record,
     );
 
-    return commitRecords(updatedRecords);
+    return persistRecords(updatedRecords, bindings);
   }
 
   const updatedRecords = [
-    ...state.records,
+    ...records,
     { name: trimmedName, createdAt: new Date().toISOString() },
   ];
 
-  return commitRecords(updatedRecords);
+  return persistRecords(updatedRecords, bindings);
+};
+
+export const removeTamagochi = async (
+  name: string,
+  bindings?: Partial<TamagochiBindings>,
+): Promise<TamagochiRecord[]> => {
+  const trimmedName = normaliseName(name);
+
+  if (!trimmedName) {
+    return resolveRecords(bindings);
+  }
+
+  const records = await resolveRecords(bindings);
+  const remaining = records.filter(
+    (record) => comparisonKey(record.name) !== comparisonKey(trimmedName),
+  );
+
+  return persistRecords(remaining, bindings);
 };
 
 export { comparisonKey, normaliseName };
