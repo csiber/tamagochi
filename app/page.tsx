@@ -5,6 +5,8 @@
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { pressStart } from "./layout";
+
 type AnimationState = "idle" | "eating" | "playing";
 type GameChoice = "kő" | "papír" | "olló";
 type GameOutcome = "win" | "lose" | "draw";
@@ -358,7 +360,9 @@ export default function Home() {
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100">
       <div className="tamagotchi-shell w-full max-w-3xl">
         <header className="text-center">
-          <h1 className="pixel-font text-2xl tracking-[0.35em] text-slate-900 drop-shadow-[0_4px_0_#0f172a] sm:text-3xl">
+          <h1
+            className={`${pressStart.className} text-2xl tracking-[0.35em] text-slate-900 drop-shadow-[0_4px_0_#0f172a] sm:text-3xl`}
+          >
             Retro Tamagochi Dínó
           </h1>
           <p className="mt-4 text-sm text-slate-800 sm:text-base">
@@ -372,7 +376,7 @@ export default function Home() {
             <div className="text-center">
               <label
                 htmlFor="pet-name"
-                className="pixel-font text-xs uppercase tracking-[0.35em] text-slate-800"
+                className={`${pressStart.className} text-xs uppercase tracking-[0.35em] text-slate-800`}
               >
                 Nevezd el a kedvencedet
               </label>
@@ -413,7 +417,9 @@ export default function Home() {
             </div>
           </form>
 
-          <p className="pixel-font mt-5 text-[0.55rem] uppercase tracking-[0.35em] text-slate-700">
+          <p
+            className={`${pressStart.className} mt-5 text-[0.55rem] uppercase tracking-[0.35em] text-slate-700`}
+          >
             Aktuális név: {petName ? petName : "nincs megadva"}
           </p>
           {nameMessage && (
@@ -433,7 +439,9 @@ export default function Home() {
 
         <section className="tamagotchi-screen mt-6">
           <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 px-6 py-8">
-            <p className="pixel-font text-center text-[0.55rem] uppercase tracking-[0.35em] text-amber-200">
+            <p
+              className={`${pressStart.className} text-center text-[0.55rem] uppercase tracking-[0.35em] text-amber-200`}
+            >
               {petName ? `${petName} kalandra kész!` : "Adj nevet a dínónak, hogy még barátságosabb legyen!"}
             </p>
             <svg
@@ -475,8 +483,8 @@ export default function Home() {
             <div className="w-full space-y-5">
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs uppercase tracking-widest text-slate-300">
-                  <span className="pixel-font text-[0.6rem]">Éhség</span>
-                  <span className="pixel-font text-[0.6rem]">{hungerPercent}%</span>
+                  <span className={`${pressStart.className} text-[0.6rem]`}>Éhség</span>
+                  <span className={`${pressStart.className} text-[0.6rem]`}>{hungerPercent}%</span>
                 </div>
                 <div className="stat-bar">
                   <div
@@ -488,8 +496,8 @@ export default function Home() {
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs uppercase tracking-widest text-slate-300">
-                  <span className="pixel-font text-[0.6rem]">Vidámság</span>
-                  <span className="pixel-font text-[0.6rem]">{happinessPercent}%</span>
+                  <span className={`${pressStart.className} text-[0.6rem]`}>Vidámság</span>
+                  <span className={`${pressStart.className} text-[0.6rem]`}>{happinessPercent}%</span>
                 </div>
                 <div className="stat-bar">
                   <div
@@ -500,7 +508,9 @@ export default function Home() {
               </div>
             </div>
 
-            <p className="pixel-font text-center text-[0.65rem] uppercase tracking-[0.25em] text-amber-200">
+            <p
+              className={`${pressStart.className} text-center text-[0.65rem] uppercase tracking-[0.25em] text-amber-200`}
+            >
               {statusMessage}
             </p>
           </div>
@@ -508,7 +518,7 @@ export default function Home() {
 
         {gameState.isOpen && (
           <section className="mt-6 w-full max-w-xl self-center rounded-3xl border-4 border-slate-900 bg-slate-900/70 p-6 text-center text-slate-100 shadow-[inset_0_0_0_4px_rgba(15,23,42,0.55)]">
-            <h2 className="pixel-font text-xs uppercase tracking-[0.35em] text-amber-200">
+            <h2 className={`${pressStart.className} text-xs uppercase tracking-[0.35em] text-amber-200`}>
               Mini-játék: Kő · Papír · Olló
             </h2>
             <p className="mt-4 text-sm text-slate-100 sm:text-base">{gameResultMessage}</p>
@@ -574,7 +584,9 @@ export default function Home() {
         </div>
 
         <footer className="mt-6 text-center">
-          <p className="pixel-font text-[0.55rem] uppercase tracking-[0.4em] text-slate-600">
+          <p
+            className={`${pressStart.className} text-[0.55rem] uppercase tracking-[0.4em] text-slate-600`}
+          >
             Cloudflare-kompatibilis retro élmény
           </p>
         </footer>
