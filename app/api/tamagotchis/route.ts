@@ -3,11 +3,22 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 
 import { readTamagotchis, type TamagochiBindings } from "@/lib/tamagotchiStorage";
 
+const resolveBindings = () => {
+  try {
+    return getRequestContext().env as Partial<TamagochiBindings>;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Cloudflare környezet nem elérhető, in-memory tárolót használunk.", error);
+    }
+    return undefined;
+  }
+};
+
 export const runtime = "edge";
 
 export async function GET() {
   try {
-    const bindings = getRequestContext().env as Partial<TamagochiBindings>;
+    const bindings = resolveBindings();
     const tamagotchis = await readTamagotchis(bindings);
     return NextResponse.json({ tamagotchis });
   } catch (error) {
