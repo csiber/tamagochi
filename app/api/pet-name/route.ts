@@ -1,10 +1,13 @@
+/* eslint-disable next-on-pages/no-nodejs-runtime */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+
+import { registerTamagochi } from "@/lib/tamagotchiStorage";
 
 const NAME_COOKIE = "tamagochi-name";
 const MAX_NAME_LENGTH = 24;
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const storedName = request.cookies.get(NAME_COOKIE)?.value ?? null;
@@ -43,6 +46,16 @@ export async function POST(request: NextRequest) {
         error: `A név legyen legfeljebb ${MAX_NAME_LENGTH} karakter hosszú!`,
       },
       { status: 400 }
+    );
+  }
+
+  try {
+    await registerTamagochi(rawName);
+  } catch (error) {
+    console.error("Nem sikerült fájlba menteni a tamagochi nevet", error);
+    return NextResponse.json(
+      { error: "Nem sikerült elmenteni a tamagochit az adatfájlba." },
+      { status: 500 },
     );
   }
 
