@@ -1,9 +1,8 @@
-/* eslint-disable next-on-pages/no-nodejs-runtime */
 import { NextResponse } from "next/server";
 
 import { readTamagotchis } from "@/lib/tamagotchiStorage";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function GET() {
   try {

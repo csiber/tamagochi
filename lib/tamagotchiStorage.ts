@@ -1,125 +1,174 @@
-import { promises as fs } from "fs";
-import { dirname, resolve } from "path";
+import rawDefaultRecords from "@/data/tamagotchis.json";
 
 export interface TamagochiRecord {
   name: string;
   createdAt: string;
 }
 
-const DATA_FILE_PATH = resolve(process.cwd(), "data", "tamagotchis.json");
-
-const DEFAULT_TAMAGOTCHIS: TamagochiRecord[] = [
-  { name: "Pixel Panni", createdAt: "2024-01-12T08:30:00.000Z" },
-  { name: "Render Róka", createdAt: "2023-11-03T18:15:00.000Z" },
-  { name: "Synth Sanyi", createdAt: "2024-03-22T10:05:00.000Z" },
-];
+type TamagochiRecordLike = {
+  name?: unknown;
+  createdAt?: unknown;
+};
 
 const normaliseName = (value: string) => value.trim();
 
 const comparisonKey = (value: string) =>
   normaliseName(value).toLocaleLowerCase("hu-HU");
 
-const isValidRecord = (entry: unknown): entry is TamagochiRecord => {
-  if (!entry || typeof entry !== "object") {
-    return false;
-  }
+const sortRecords = (records: TamagochiRecord[]): TamagochiRecord[] =>
+  [...records].sort((first, second) =>
+    Date.parse(first.createdAt) - Date.parse(second.createdAt),
+  );
 
-  const candidate = entry as Partial<TamagochiRecord>;
+const sanitiseRecords = (
+  records: Iterable<TamagochiRecordLike>,
+): TamagochiRecord[] => {
+  const sanitised: TamagochiRecord[] = [];
 
-  if (typeof candidate.name !== "string" || typeof candidate.createdAt !== "string") {
-    return false;
-  }
-
-  const normalisedName = normaliseName(candidate.name);
-  const createdTime = Number.isNaN(Date.parse(candidate.createdAt))
-    ? Number.NaN
-    : Date.parse(candidate.createdAt);
-
-  return normalisedName.length > 0 && Number.isFinite(createdTime);
-};
-
-const writeTamagotchis = async (records: TamagochiRecord[]) => {
-  await fs.mkdir(dirname(DATA_FILE_PATH), { recursive: true });
-  const sortedRecords = [...records].sort((a, b) => {
-    const aTime = Date.parse(a.createdAt);
-    const bTime = Date.parse(b.createdAt);
-    return aTime - bTime;
-  });
-  await fs.writeFile(DATA_FILE_PATH, JSON.stringify(sortedRecords, null, 2), "utf-8");
-};
-
-const ensureDataFile = async () => {
-  try {
-    await fs.access(DATA_FILE_PATH);
-  } catch {
-    await writeTamagotchis(DEFAULT_TAMAGOTCHIS);
-  }
-};
-
-const loadRecords = async () => {
-  await ensureDataFile();
-
-  try {
-    const rawContent = await fs.readFile(DATA_FILE_PATH, "utf-8");
-    const parsed: unknown = JSON.parse(rawContent);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("A tamagochi lista nem tömb formátumú.");
+  for (const entry of records) {
+    if (!entry || typeof entry !== "object") {
+      continue;
     }
 
-    const records = parsed.filter(isValidRecord).map((entry) => ({
-      name: normaliseName((entry as TamagochiRecord).name),
-      createdAt: new Date((entry as TamagochiRecord).createdAt).toISOString(),
-    }));
+    const candidate = entry as TamagochiRecordLike;
 
-    if (records.length === 0) {
-      throw new Error("Nincs érvényes tamagochi bejegyzés.");
+    if (typeof candidate.name !== "string" || typeof candidate.createdAt !== "string") {
+      continue;
     }
 
-    return records;
-  } catch {
-    await writeTamagotchis(DEFAULT_TAMAGOTCHIS);
-    return DEFAULT_TAMAGOTCHIS;
+    const trimmedName = normaliseName(candidate.name);
+    const parsedTime = Date.parse(candidate.createdAt);
+
+    if (!trimmedName || Number.isNaN(parsedTime)) {
+      continue;
+    }
+
+    sanitised.push({
+      name: trimmedName,
+      createdAt: new Date(parsedTime).toISOString(),
+    });
   }
+
+  if (sanitised.length === 0) {
+    return sanitised;
+  }
+
+  return sortRecords(sanitised);
+};
+
+const FALLBACK_TAMAGOTCHIS = sanitiseRecords([
+  { name: "Pixel Panni", createdAt: "2024-01-12T08:30:00.000Z" },
+  { name: "Render Róka", createdAt: "2023-11-03T18:15:00.000Z" },
+  { name: "Synth Sanyi", createdAt: "2024-03-22T10:05:00.000Z" },
+]);
+
+const parseDefaultRecords = (): TamagochiRecord[] => {
+  const dataset = rawDefaultRecords as unknown;
+
+  if (!Array.isArray(dataset)) {
+    return FALLBACK_TAMAGOTCHIS;
+  }
+
+  const parsed = sanitiseRecords(dataset as Iterable<TamagochiRecordLike>);
+
+  if (parsed.length === 0) {
+    return FALLBACK_TAMAGOTCHIS;
+  }
+
+  return parsed;
+};
+
+const DEFAULT_TAMAGOTCHIS = parseDefaultRecords();
+
+const STORAGE_KEY = "__tamagochi_state__" as const;
+
+type GlobalTamagochiState = {
+  records: TamagochiRecord[];
+};
+
+type GlobalTamagochiScope = typeof globalThis & {
+  [STORAGE_KEY]?: GlobalTamagochiState;
+};
+
+const cloneRecords = (records: TamagochiRecord[]): TamagochiRecord[] =>
+  records.map((record) => ({ ...record }));
+
+const getGlobalScope = () => globalThis as GlobalTamagochiScope;
+
+const ensureState = (): GlobalTamagochiState => {
+  const scope = getGlobalScope();
+
+  if (!scope[STORAGE_KEY]) {
+    scope[STORAGE_KEY] = {
+      records: cloneRecords(DEFAULT_TAMAGOTCHIS),
+    };
+
+    return scope[STORAGE_KEY]!;
+  }
+
+  const sanitised = sanitiseRecords(scope[STORAGE_KEY]!.records);
+
+  if (sanitised.length === 0) {
+    scope[STORAGE_KEY]!.records = cloneRecords(DEFAULT_TAMAGOTCHIS);
+  } else {
+    scope[STORAGE_KEY]!.records = sanitised;
+  }
+
+  return scope[STORAGE_KEY]!;
+};
+
+const commitRecords = (
+  records: Iterable<TamagochiRecordLike>,
+): TamagochiRecord[] => {
+  const sanitised = sanitiseRecords(records);
+  const scope = getGlobalScope();
+  const nextRecords =
+    sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
+
+  scope[STORAGE_KEY] = { records: nextRecords };
+
+  return cloneRecords(nextRecords);
 };
 
 export const readTamagotchis = async (): Promise<TamagochiRecord[]> => {
-  const records = await loadRecords();
-  return records;
+  const state = ensureState();
+  return cloneRecords(state.records);
 };
 
-export const registerTamagochi = async (name: string) => {
+export const registerTamagochi = async (
+  name: string,
+): Promise<TamagochiRecord[]> => {
   const trimmedName = normaliseName(name);
 
   if (!trimmedName) {
-    return await readTamagotchis();
+    return readTamagotchis();
   }
 
-  const records = await loadRecords();
-
-  const existingIndex = records.findIndex(
+  const state = ensureState();
+  const existingIndex = state.records.findIndex(
     (record) => comparisonKey(record.name) === comparisonKey(trimmedName),
   );
 
   if (existingIndex >= 0) {
-    const existing = records[existingIndex]!;
+    const existing = state.records[existingIndex]!;
 
-    if (existing.name !== trimmedName) {
-      records[existingIndex] = {
-        ...existing,
-        name: trimmedName,
-      };
-      await writeTamagotchis(records);
+    if (existing.name === trimmedName) {
+      return cloneRecords(state.records);
     }
 
-    return records;
+    const updatedRecords = state.records.map((record, index) =>
+      index === existingIndex ? { ...record, name: trimmedName } : record,
+    );
+
+    return commitRecords(updatedRecords);
   }
 
-  const newRecords = [
-    ...records,
+  const updatedRecords = [
+    ...state.records,
     { name: trimmedName, createdAt: new Date().toISOString() },
   ];
 
-  await writeTamagotchis(newRecords);
-  return newRecords;
+  return commitRecords(updatedRecords);
 };
+
+export { comparisonKey, normaliseName };
