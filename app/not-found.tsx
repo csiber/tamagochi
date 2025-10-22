@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
+
 export const runtime = "edge";
+
+export const metadata: Metadata = {
+  title: "404: Az oldal nem található",
+};
 
 export default function NotFound() {
   return (
     <>
-      <title>404: Az oldal nem található</title>
       <div style={styles.error}>
         <div>
           <style
