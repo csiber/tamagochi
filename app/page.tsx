@@ -1,7 +1,13 @@
 "use client";
 
 import type { ChangeEvent, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { pressStart } from "./fonts";
 
@@ -20,221 +26,66 @@ interface MoodOption {
   gradient: string;
 }
 
-interface StoryHighlight {
-  id: number;
-  title: string;
-  subtitle: string;
-  gradient: string;
-}
-
-interface FriendSuggestion {
-  id: number;
-  name: string;
-  handle: string;
-  sharedInterest: string;
-  mutualCount: number;
-}
-
-interface EventCard {
-  id: number;
-  title: string;
-  day: string;
-  time: string;
-  location: string;
-  description: string;
-}
-
-interface Post {
-  id: number;
-  author: string;
-  handle: string;
-  mood: string;
-  timeAgo: string;
-  content: string;
-  likes: number;
-  comments: number;
-  isLiked: boolean;
-  accent: string;
-  topics: string[];
-}
-
 interface ActivityItem {
   id: number;
   message: string;
   timeAgo: string;
 }
 
+interface TamagochiInfo {
+  name: string;
+  createdAt: string;
+}
+
 const MAX_LOG_ITEMS = 7;
+const INITIAL_STATUS = "A tamagochi kíváncsian pislog a világra.";
 
 const moodOptions: MoodOption[] = [
   {
     id: "vidam",
     label: "Vidám",
-    description: "Tele vagy energiával és kész vagy inspirálni másokat.",
+    description: "Neonfényű park, sok kacagás és pattogó pixel labdák.",
     emoji: "🌞",
     gradient: "from-amber-400/80 to-orange-400/40",
   },
   {
     id: "kreativ",
     label: "Kreatív",
-    description: "Új pixelek születnek a fejedben, rajzold meg őket!",
+    description: "Rajztábla, csillámos sprite-ok és végtelen fantázia.",
     emoji: "🎨",
     gradient: "from-fuchsia-500/70 to-purple-500/40",
   },
   {
     id: "nyugodt",
     label: "Nyugodt",
-    description: "Lassú esti hangulat, lila égbolt és jó társaság.",
+    description: "Csillagos ég, halk lo-fi és lassú szuszogás.",
     emoji: "🌙",
     gradient: "from-emerald-400/70 to-teal-500/30",
   },
   {
     id: "nosztalgikus",
     label: "Nosztalgikus",
-    description: "Visszatértél a régi konzolokhoz és a kazettás zenékhez.",
+    description: "8-bites emlékek, kazettás magnó és békebeli játékok.",
     emoji: "📼",
     gradient: "from-sky-400/70 to-indigo-500/40",
-  },
-];
-
-const storyHighlights: StoryHighlight[] = [
-  {
-    id: 1,
-    title: "Dínó Klub",
-    subtitle: "Pixel jam ma 20:00",
-    gradient: "from-pink-400 via-fuchsia-500 to-violet-500",
-  },
-  {
-    id: 2,
-    title: "Kódsarok",
-    subtitle: "Refaktor kihívás",
-    gradient: "from-amber-300 via-orange-400 to-rose-400",
-  },
-  {
-    id: 3,
-    title: "Futó csapat",
-    subtitle: "5 km napfelkeltekor",
-    gradient: "from-sky-400 via-cyan-400 to-teal-400",
-  },
-  {
-    id: 4,
-    title: "Hangár",
-    subtitle: "Chill synthwave mix",
-    gradient: "from-emerald-400 via-lime-400 to-teal-500",
-  },
-];
-
-const friendSuggestions: FriendSuggestion[] = [
-  {
-    id: 1,
-    name: "Pixel Panni",
-    handle: "@pixelpanni",
-    sharedInterest: "Retro illusztráció",
-    mutualCount: 4,
-  },
-  {
-    id: 2,
-    name: "Render Róka",
-    handle: "@renderroka",
-    sharedInterest: "Shader varázslat",
-    mutualCount: 2,
-  },
-  {
-    id: 3,
-    name: "Beat Bence",
-    handle: "@beatbence",
-    sharedInterest: "Lo-fi zenék",
-    mutualCount: 5,
-  },
-];
-
-const upcomingEvents: EventCard[] = [
-  {
-    id: 1,
-    title: "Közös sprite rajzolás",
-    day: "Május 14.",
-    time: "18:30",
-    location: "Digitális stúdió · Hangcsatorna",
-    description:
-      "Együtt polírozzuk a karaktereinket és megosztjuk a legjobb tippeket.",
-  },
-  {
-    id: 2,
-    title: "Retro konzol est",
-    day: "Május 17.",
-    time: "20:00",
-    location: "Nappali szoba · VR-lobby",
-    description: "Mini-verseny és nosztalgikus beszélgetések a kedvenc játékokról.",
-  },
-];
-
-const accentPalette = [
-  "from-orange-400/80 to-rose-500/60",
-  "from-sky-400/80 to-indigo-500/60",
-  "from-emerald-400/80 to-teal-500/60",
-  "from-fuchsia-500/80 to-purple-600/60",
-];
-
-const INITIAL_POSTS: Post[] = [
-  {
-    id: 1,
-    author: "Kódoló Karcsi",
-    handle: "@karcsikod",
-    mood: "lelkes",
-    timeAgo: "12 perce",
-    content:
-      "Új layoutot kapott a dínó közösség! A kedvenc retro színeimet vittem bele, kíváncsi vagyok, nektek hogy tetszik.",
-    likes: 48,
-    comments: 9,
-    isLiked: false,
-    accent: accentPalette[1],
-    topics: ["#design", "#retrohangulat"],
-  },
-  {
-    id: 2,
-    author: "Távkapcs Timi",
-    handle: "@timistreams",
-    mood: "közösségi",
-    timeAgo: "36 perce",
-    content:
-      "Ma esti élő adásban közösen fejlesztjük tovább a mini közösségi funkciókat. Miket látnátok szívesen?",
-    likes: 31,
-    comments: 7,
-    isLiked: false,
-    accent: accentPalette[0],
-    topics: ["#livestream", "#kozosmunka"],
-  },
-  {
-    id: 3,
-    author: "Synth Sanyi",
-    handle: "@synthsanyi",
-    mood: "kreatív",
-    timeAgo: "1 órája",
-    content:
-      "Felkértek, hogy írjak egy rövid synthwave intrót a DinoNet következő eseményéhez. Alig várom, hogy meghallgassátok!",
-    likes: 54,
-    comments: 12,
-    isLiked: false,
-    accent: accentPalette[2],
-    topics: ["#zene", "#synthwave"],
   },
 ];
 
 const initialActivity: ActivityItem[] = [
   {
     id: 1,
-    message: "Bekövetetted Pixel Norbit.",
-    timeAgo: "2 perce",
+    message: "A tojás megrepedt és egy kíváncsi tamagochi bukkant elő!",
+    timeAgo: "néhány perce",
   },
   {
     id: 2,
-    message: "Visszajelöltél egy közösségi eseményt.",
-    timeAgo: "8 perce",
+    message: "Megsimogattad a pixel bundáját.",
+    timeAgo: "nemrég",
   },
   {
     id: 3,
-    message: "Megjegyezted: 'Közös sprite rajzolás' tetszik.",
-    timeAgo: "20 perce",
+    message: "A tamagochi megfigyelte a neonfényű eget.",
+    timeAgo: "nemrég",
   },
 ];
 
@@ -247,13 +98,13 @@ const slugifyHungarian = (value: string) => {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-  return normalised || "nevtelen-dino";
+  return normalised || "pixel-tamagochi";
 };
 
 const initialsFromName = (name: string) => {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
-    return "DK";
+    return "TG";
   }
 
   if (words.length === 1) {
@@ -263,9 +114,70 @@ const initialsFromName = (name: string) => {
   return `${words[0]!.charAt(0)}${words[words.length - 1]!.charAt(0)}`.toUpperCase();
 };
 
-const extractTopics = (text: string) => {
-  const matches = text.match(/#[\p{L}0-9_-]+/gu) ?? [];
-  return matches.map((tag) => tag.toLowerCase());
+const namesEqual = (first: string, second: string) =>
+  first.trim().toLocaleLowerCase("hu-HU") === second.trim().toLocaleLowerCase("hu-HU");
+
+const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
+
+const formatElapsedTime = (createdAt: string, nowMs: number) => {
+  const createdTime = Date.parse(createdAt);
+
+  if (Number.isNaN(createdTime)) {
+    return "Ismeretlen ideje";
+  }
+
+  const diffMs = Math.max(0, nowMs - createdTime);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  const formatQuantity = (value: number, singular: string, plural: string) =>
+    value === 1 ? singular : `${value} ${plural}`;
+
+  if (diffMs < minute) {
+    return "Néhány másodperce";
+  }
+
+  if (diffMs < hour) {
+    const minutes = Math.floor(diffMs / minute);
+    return formatQuantity(minutes, "1 perce", `${minutes} perce`);
+  }
+
+  if (diffMs < day) {
+    const hours = Math.floor(diffMs / hour);
+    return formatQuantity(hours, "1 órája", `${hours} órája`);
+  }
+
+  if (diffMs < month) {
+    const days = Math.floor(diffMs / day);
+    return formatQuantity(days, "1 napja", `${days} napja`);
+  }
+
+  if (diffMs < year) {
+    const months = Math.floor(diffMs / month);
+    return formatQuantity(months, "1 hónapja", `${months} hónapja`);
+  }
+
+  const years = Math.floor(diffMs / year);
+  return formatQuantity(years, "1 éve", `${years} éve`);
+};
+
+const formatBirthDate = (createdAt: string) => {
+  const createdTime = Date.parse(createdAt);
+
+  if (Number.isNaN(createdTime)) {
+    return null;
+  }
+
+  return new Date(createdTime).toLocaleString("hu-HU", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 export default function Home() {
@@ -276,16 +188,72 @@ export default function Home() {
   const [isClearingName, setIsClearingName] = useState(false);
 
   const [selectedMood, setSelectedMood] = useState<string>(moodOptions[0]!.id);
-  const [composerText, setComposerText] = useState<string>("");
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [tamagochiStatus, setTamagochiStatus] = useState<string>(INITIAL_STATUS);
+  const [tamagotchiStats, setTamagotchiStats] = useState({
+    hunger: 68,
+    energy: 72,
+    happiness: 70,
+  });
+  const [careStats, setCareStats] = useState({
+    meals: 0,
+    plays: 0,
+    rests: 0,
+  });
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivity);
 
-  const addActivity = (message: string) => {
+  const [tamagotchis, setTamagotchis] = useState<TamagochiInfo[]>([]);
+  const [tamagotchiError, setTamagotchiError] = useState<string | null>(null);
+  const [isLoadingTamagotchis, setIsLoadingTamagotchis] = useState(true);
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+
+  const warningRef = useRef({ hunger: false, energy: false, happiness: false });
+
+  const addActivity = useCallback((message: string) => {
     setActivityLog((prev) => [
       { id: Date.now(), message, timeAgo: "épp most" },
       ...prev.slice(0, MAX_LOG_ITEMS - 1),
     ]);
-  };
+  }, []);
+
+  const applyStatChanges = useCallback(
+    (changes: Partial<{ hunger: number; energy: number; happiness: number }>) => {
+      setTamagotchiStats((previous) => ({
+        hunger: clamp(previous.hunger + (changes.hunger ?? 0)),
+        energy: clamp(previous.energy + (changes.energy ?? 0)),
+        happiness: clamp(previous.happiness + (changes.happiness ?? 0)),
+      }));
+    },
+    [],
+  );
+
+  const refreshTamagotchis = useCallback(async () => {
+    setIsLoadingTamagotchis(true);
+    setTamagotchiError(null);
+
+    try {
+      const response = await fetch("/api/tamagotchis", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Hibás válaszkód: ${response.status}`);
+      }
+
+      const data: { tamagotchis?: TamagochiInfo[]; error?: string } =
+        await response.json();
+
+      if (!data.tamagotchis) {
+        throw new Error(data.error ?? "Hiányzó tamagochi adatok.");
+      }
+
+      setTamagotchis(data.tamagotchis);
+    } catch (error) {
+      console.error("Nem sikerült frissíteni a tamagochi listát", error);
+      setTamagotchiError("Nem sikerült betölteni a tamagochi társakat.");
+    } finally {
+      setIsLoadingTamagotchis(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchStoredName = async () => {
@@ -304,16 +272,97 @@ export default function Home() {
           setNameInput(data.name);
           setNameMessage({
             type: "info",
-            message: "A profilnév betöltve a sessionből.",
+            message: "A tamagochi neve betöltve a sessionből.",
           });
         }
       } catch (error) {
-        console.error("Nem sikerült betölteni a profilnevet", error);
+        console.error("Nem sikerült betölteni a tamagochi nevét", error);
       }
     };
 
-    fetchStoredName();
+    void fetchStoredName();
+    void refreshTamagotchis();
+  }, [refreshTamagotchis]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const delta = { hunger: -3, energy: -2, happiness: -2 };
+
+      if (selectedMood === "vidam") {
+        delta.hunger -= 1;
+        delta.happiness += 0.5;
+      } else if (selectedMood === "nyugodt") {
+        delta.energy += 0.7;
+      } else if (selectedMood === "nosztalgikus") {
+        delta.happiness += 0.8;
+      }
+
+      applyStatChanges(delta);
+    }, 12_000);
+
+    return () => window.clearInterval(interval);
+  }, [applyStatChanges, selectedMood]);
+
+  useEffect(() => {
+    const selectedMoodOption =
+      moodOptions.find((option) => option.id === selectedMood) ?? moodOptions[0]!;
+
+    const averageMood =
+      (tamagotchiStats.hunger + tamagotchiStats.energy + tamagotchiStats.happiness) / 3;
+
+    if (averageMood >= 75) {
+      setTamagochiStatus(
+        `${selectedMoodOption.emoji} ${selectedMoodOption.label} üzemmód: boldogan csillog a kis pixel lény!`,
+      );
+    } else if (averageMood >= 55) {
+      setTamagochiStatus(
+        `${selectedMoodOption.emoji} A tamagochi kiegyensúlyozott és kíváncsian figyel.`,
+      );
+    } else if (averageMood >= 35) {
+      setTamagochiStatus(
+        `${selectedMoodOption.emoji} Kicsit nyűgös, jólesne neki egy kis törődés.`,
+      );
+    } else {
+      setTamagochiStatus(
+        `${selectedMoodOption.emoji} Vészjelzés! A tamagochi sürgősen gondoskodásra vágyik.`,
+      );
+    }
+  }, [selectedMood, tamagotchiStats.happiness, tamagotchiStats.energy, tamagotchiStats.hunger]);
+
+  useEffect(() => {
+    const warnings: string[] = [];
+
+    if (tamagotchiStats.hunger <= 25 && !warningRef.current.hunger) {
+      warnings.push("A tamagochi éhesen morog.");
+      warningRef.current.hunger = true;
+    } else if (tamagotchiStats.hunger > 40 && warningRef.current.hunger) {
+      warningRef.current.hunger = false;
+    }
+
+    if (tamagotchiStats.energy <= 25 && !warningRef.current.energy) {
+      warnings.push("A tamagochi kezd lemerülni, ideje pihenni.");
+      warningRef.current.energy = true;
+    } else if (tamagotchiStats.energy > 40 && warningRef.current.energy) {
+      warningRef.current.energy = false;
+    }
+
+    if (tamagotchiStats.happiness <= 30 && !warningRef.current.happiness) {
+      warnings.push("A tamagochi hiányolja a játékot.");
+      warningRef.current.happiness = true;
+    } else if (tamagotchiStats.happiness > 45 && warningRef.current.happiness) {
+      warningRef.current.happiness = false;
+    }
+
+    warnings.forEach((warning) => addActivity(warning));
+  }, [addActivity, tamagotchiStats.energy, tamagotchiStats.happiness, tamagotchiStats.hunger]);
 
   const handleNameInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setNameInput(event.target.value);
@@ -326,7 +375,7 @@ export default function Home() {
     if (!trimmedName) {
       setNameMessage({
         type: "error",
-        message: "Adj meg egy nevet, mielőtt elmented!",
+        message: "Adj meg egy nevet a tamagochinak!",
       });
       return;
     }
@@ -349,8 +398,7 @@ export default function Home() {
       if (!response.ok) {
         setNameMessage({
           type: "error",
-          message:
-            data.error ?? "Nem sikerült elmenteni a nevet. Próbáld újra!",
+          message: data.error ?? "Nem sikerült elmenteni a tamagochi nevét.",
         });
         return;
       }
@@ -362,14 +410,15 @@ export default function Home() {
 
       setNameMessage({
         type: "success",
-        message: "Siker! A profilnév elmentve a sessionbe.",
+        message: "Siker! A tamagochi neve elmentve.",
       });
-      addActivity("Frissítetted a profilnevedet.");
+      addActivity("Nevet adtál a tamagochinak.");
+      void refreshTamagotchis();
     } catch (error) {
-      console.error("Nem sikerült menteni a nevet", error);
+      console.error("Nem sikerült menteni a tamagochi nevét", error);
       setNameMessage({
         type: "error",
-        message: "Ismeretlen hiba történt. Próbáld meg később!",
+        message: "Ismeretlen hiba történt mentés közben.",
       });
     } finally {
       setIsSavingName(false);
@@ -389,7 +438,7 @@ export default function Home() {
       if (!response.ok) {
         setNameMessage({
           type: "error",
-          message: "Nem sikerült törölni a nevet. Próbáld újra!",
+          message: "Nem sikerült törölni a tamagochi nevét.",
         });
         return;
       }
@@ -398,11 +447,12 @@ export default function Home() {
       setNameInput("");
       setNameMessage({
         type: "info",
-        message: "A profilnév törölve lett a sessionből.",
+        message: "A tamagochi neve törlésre került a sessionből.",
       });
-      addActivity("Eltávolítottad a profilnevedet.");
+      addActivity("Eltávolítottad a tamagochi nevét.");
+      void refreshTamagotchis();
     } catch (error) {
-      console.error("Nem sikerült törölni a nevet", error);
+      console.error("Nem sikerült törölni a tamagochi nevét", error);
       setNameMessage({
         type: "error",
         message: "Váratlan hiba történt a törlés közben.",
@@ -412,96 +462,116 @@ export default function Home() {
     }
   };
 
-  const profileHandle = useMemo(() => {
-    return `@${slugifyHungarian(profileName || "DinoNet közösségi tag")}`;
-  }, [profileName]);
+  const handleMoodSelection = (moodId: string) => {
+    if (moodId === selectedMood) {
+      return;
+    }
 
-  const displayName = profileName || "Névtelen dinoszaurusz";
-  const profileInitials = useMemo(() => initialsFromName(displayName), [displayName]);
+    const selected = moodOptions.find((option) => option.id === moodId);
+    setSelectedMood(moodId);
+
+    if (selected) {
+      addActivity(`Hangulat mód: ${selected.label}.`);
+    }
+  };
+
+  const handleFeed = () => {
+    const hungerBoost = selectedMood === "vidam" ? 20 : 18;
+    const happinessBoost = selectedMood === "nosztalgikus" ? 8 : 6;
+    applyStatChanges({ hunger: hungerBoost, happiness: happinessBoost, energy: 4 });
+    setCareStats((previous) => ({
+      ...previous,
+      meals: previous.meals + 1,
+    }));
+    addActivity("Finom pixel-ebédet kapott a tamagochi.");
+  };
+
+  const handlePlay = () => {
+    const energyCost = selectedMood === "kreativ" ? -3 : -6;
+    const happinessBoost = selectedMood === "vidam" ? 14 : 12;
+    applyStatChanges({ happiness: happinessBoost, energy: energyCost, hunger: -4 });
+    setCareStats((previous) => ({
+      ...previous,
+      plays: previous.plays + 1,
+    }));
+    addActivity("Játékra hívtad a tamagochit.");
+  };
+
+  const handleRest = () => {
+    const energyBoost = selectedMood === "nyugodt" ? 22 : 16;
+    applyStatChanges({ energy: energyBoost, hunger: -3, happiness: 4 });
+    setCareStats((previous) => ({
+      ...previous,
+      rests: previous.rests + 1,
+    }));
+    addActivity("Lefektetted egy kis pihenésre.");
+  };
 
   const selectedMoodOption = useMemo(
     () => moodOptions.find((option) => option.id === selectedMood) ?? moodOptions[0]!,
     [selectedMood],
   );
 
-  const totalLikes = useMemo(
-    () => posts.reduce((acc, post) => acc + post.likes, 0),
-    [posts],
+  const displayName = profileName || "Névtelen tamagochi";
+  const profileInitials = useMemo(() => initialsFromName(displayName), [displayName]);
+  const tamagochiHandle = useMemo(() => slugifyHungarian(displayName), [displayName]);
+
+  const myTamagochi = useMemo(
+    () =>
+      tamagotchis.find((record) => profileName && namesEqual(record.name, profileName)) ?? null,
+    [profileName, tamagotchis],
   );
 
-  const totalTopics = useMemo(
-    () => new Set(posts.flatMap((post) => post.topics)).size,
-    [posts],
+  const tamagochiAgeText = useMemo(() => {
+    if (!myTamagochi) {
+      return "A névadás után indul a közös történet.";
+    }
+
+    return formatElapsedTime(myTamagochi.createdAt, nowTimestamp);
+  }, [myTamagochi, nowTimestamp]);
+
+  const tamagochiBirthDate = useMemo(() => {
+    if (!myTamagochi) {
+      return null;
+    }
+
+    return formatBirthDate(myTamagochi.createdAt);
+  }, [myTamagochi]);
+
+  const otherTamagotchis = useMemo(
+    () =>
+      tamagotchis.filter((record) =>
+        profileName ? !namesEqual(record.name, profileName) : true,
+      ),
+    [profileName, tamagotchis],
   );
 
-  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setComposerText(event.target.value);
-  };
-
-  const handlePublishPost = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedText = composerText.trim();
-
-    if (!trimmedText) {
-      addActivity("Próbáltál üres bejegyzést megosztani.");
-      return;
-    }
-
-    const extractedTopics = extractTopics(trimmedText);
-    const fallbackTopic = `#${selectedMoodOption.label.toLowerCase()}`;
-
-    const newPost: Post = {
-      id: Date.now(),
-      author: displayName,
-      handle: profileHandle,
-      mood: selectedMoodOption.label.toLowerCase(),
-      timeAgo: "épp most",
-      content: trimmedText,
-      likes: 1,
-      comments: 0,
-      isLiked: true,
-      accent: accentPalette[Math.floor(Math.random() * accentPalette.length)]!,
-      topics: extractedTopics.length > 0 ? extractedTopics : [fallbackTopic],
-    };
-
-    setPosts((prev) => [newPost, ...prev]);
-    addActivity("Megosztottál egy új bejegyzést.");
-    setComposerText("");
-  };
-
-  const toggleLike = (postId: number) => {
-    let activityMessage: string | null = null;
-
-    setPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id !== postId) {
-          return post;
-        }
-
-        const liked = !post.isLiked;
-        activityMessage = liked
-          ? `Kedvelted ${post.author} bejegyzését.`
-          : `Levetted a szívet ${post.author} bejegyzéséről.`;
-
-        return {
-          ...post,
-          isLiked: liked,
-          likes: post.likes + (liked ? 1 : -1),
-        };
-      }),
-    );
-
-    if (activityMessage) {
-      addActivity(activityMessage);
-    }
-  };
-
-  const moodBadges = useMemo(() => {
-    return posts
-      .slice(0, 6)
-      .map((post) => `#${post.mood.replace(/\s+/g, "")}`)
-      .filter((value, index, array) => array.indexOf(value) === index);
-  }, [posts]);
+  const statItems = useMemo(
+    () => [
+      {
+        id: "hunger",
+        label: "Jóllakottság",
+        value: tamagotchiStats.hunger,
+        accent: "from-amber-300/80 to-orange-500/80",
+        icon: "🍽️",
+      },
+      {
+        id: "happiness",
+        label: "Kedv",
+        value: tamagotchiStats.happiness,
+        accent: "from-pink-300/80 to-fuchsia-500/80",
+        icon: "🎉",
+      },
+      {
+        id: "energy",
+        label: "Energia",
+        value: tamagotchiStats.energy,
+        accent: "from-emerald-300/80 to-teal-500/80",
+        icon: "⚡",
+      },
+    ],
+    [tamagotchiStats.energy, tamagotchiStats.happiness, tamagotchiStats.hunger],
+  );
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -516,300 +586,281 @@ export default function Home() {
                 <div>
                   <p className="text-sm uppercase tracking-[0.35em] text-emerald-300">
                     {pressStart.className ? (
-                      <span className={pressStart.className}>Profil</span>
+                      <span className={pressStart.className}>Gondozó</span>
                     ) : (
-                      "Profil"
+                      "Gondozó"
                     )}
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold text-slate-50">{displayName}</h2>
-                  <p className="text-sm text-slate-400">{profileHandle}</p>
+                  <h2 className="text-xl font-semibold text-slate-50">{displayName}</h2>
+                  <p className="text-xs text-slate-400">@{tamagochiHandle}</p>
+                  <p className="mt-1 text-xs text-emerald-200">Mióta él: {tamagochiAgeText}</p>
+                  {tamagochiBirthDate && (
+                    <p className="text-xs text-slate-400">Kikelés: {tamagochiBirthDate}</p>
+                  )}
                 </div>
               </header>
 
-              <dl className="grid grid-cols-3 gap-4 text-center text-sm">
-                <div className="rounded-2xl border border-slate-700/70 bg-slate-800/40 p-3">
-                  <dt className="text-xs uppercase tracking-widest text-slate-400">Bejegyzések</dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-50">{posts.length}</dd>
-                </div>
-                <div className="rounded-2xl border border-slate-700/70 bg-slate-800/40 p-3">
-                  <dt className="text-xs uppercase tracking-widest text-slate-400">Reakciók</dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-50">{totalLikes}</dd>
-                </div>
-                <div className="rounded-2xl border border-slate-700/70 bg-slate-800/40 p-3">
-                  <dt className="text-xs uppercase tracking-widest text-slate-400">Témák</dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-50">{totalTopics}</dd>
-                </div>
-              </dl>
-
-              <form onSubmit={handleSaveName} className="space-y-3">
-                <label htmlFor="profile-name" className="text-xs uppercase tracking-[0.35em] text-slate-400">
-                  Válassz közösségi nevet
-                </label>
-                <input
-                  id="profile-name"
-                  name="profile-name"
-                  value={nameInput}
-                  onChange={handleNameInputChange}
-                  maxLength={32}
-                  placeholder="Írd ide a neved"
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-900/50 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={isSavingName}
-                    className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isSavingName ? "Mentés..." : "Mentés"}
-                  </button>
-                  {profileName && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-300">
+                  Nevezd el a tamagochit, hogy a történetetek bekerüljön a naplóba.
+                </p>
+                <form onSubmit={handleSaveName} className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={handleNameInputChange}
+                      placeholder="Tamagochi neve"
+                      className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                      maxLength={32}
+                    />
                     <button
-                      type="button"
-                      onClick={handleClearName}
-                      disabled={isClearingName}
-                      className="rounded-2xl border border-rose-400 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-70"
+                      type="submit"
+                      className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300"
+                      disabled={isSavingName}
                     >
-                      {isClearingName ? "Törlés..." : "Törlés"}
+                      {isSavingName ? "Mentés..." : "Mentés"}
                     </button>
-                  )}
-                </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearName}
+                    className="w-full rounded-2xl border border-emerald-400/40 px-4 py-2 text-sm text-emerald-200 transition hover:bg-emerald-400/10"
+                    disabled={isClearingName}
+                  >
+                    {isClearingName ? "Törlés folyamatban..." : "Név törlése"}
+                  </button>
+                </form>
                 {nameMessage && (
                   <p
                     className={`text-sm ${
-                      nameMessage.type === "error"
+                      nameMessage.type === "success"
+                        ? "text-emerald-300"
+                        : nameMessage.type === "error"
                         ? "text-rose-300"
-                        : nameMessage.type === "success"
-                          ? "text-emerald-300"
-                          : "text-amber-300"
+                        : "text-slate-300"
                     }`}
                   >
                     {nameMessage.message}
                   </p>
                 )}
-              </form>
-            </section>
-
-            <section className="community-card">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Hangulatod</h3>
-              <p className="mt-2 text-sm text-slate-300">
-                Válaszd ki, milyen rezgést közvetítesz ma a DinoNeten.
-              </p>
-
-              <div className="mt-4 grid gap-3">
-                {moodOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setSelectedMood(option.id)}
-                    className={`group flex items-start gap-3 rounded-2xl border border-slate-700/60 bg-slate-900/30 p-4 text-left transition ${
-                      selectedMood === option.id
-                        ? "border-emerald-400/80 bg-emerald-400/10"
-                        : "hover:border-emerald-300/60 hover:bg-emerald-400/10"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-gradient-to-br ${option.gradient} text-lg text-slate-900 shadow-lg`}
-                      aria-hidden
-                    >
-                      {option.emoji}
-                    </span>
-                    <span>
-                      <span className="block font-semibold text-slate-50">{option.label}</span>
-                      <span className="mt-1 block text-sm text-slate-300">{option.description}</span>
-                    </span>
-                  </button>
-                ))}
               </div>
             </section>
 
-            <section className="community-card">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Közeli aktivitások</h3>
-              <ul className="mt-4 space-y-3 text-sm">
-                {activityLog.map((item) => (
-                  <li key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-slate-900/30 p-3">
-                    <span className="mt-1 inline-flex h-2.5 w-2.5 flex-none rounded-full bg-emerald-400" aria-hidden />
-                    <span className="text-slate-200">
-                      {item.message}
-                      <span className="block text-xs text-slate-500">{item.timeAgo}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            <section className="community-card space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                Hangulat modulok
+              </h3>
+              <p className="text-sm text-slate-300">
+                Válaszd ki, milyen aurába burkoljuk a tamagochit ma este.
+              </p>
+              <div className="grid gap-3">
+                {moodOptions.map((option) => {
+                  const isActive = option.id === selectedMood;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => handleMoodSelection(option.id)}
+                      className={`flex w-full items-start gap-3 rounded-2xl border bg-slate-900/30 p-3 text-left transition hover:border-emerald-400/50 hover:bg-slate-900/60 ${
+                        isActive
+                          ? "border-emerald-400/70"
+                          : "border-slate-800/70"
+                      }`}
+                    >
+                      <span className="text-2xl" aria-hidden>
+                        {option.emoji}
+                      </span>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-slate-100">{option.label}</p>
+                        <p className="text-xs text-slate-400">{option.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </section>
           </aside>
 
           <section className="space-y-6">
-            <div className="community-card">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold text-slate-50">Kiemelt történetek</h2>
-                <span className="text-xs uppercase tracking-[0.35em] text-emerald-200">Ma aktív</span>
-              </div>
-              <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-                {storyHighlights.map((story) => (
-                  <article
-                    key={story.id}
-                    className={`story-highlight bg-gradient-to-br ${story.gradient} relative w-[180px] flex-none overflow-hidden rounded-3xl p-4`}
-                  >
-                    <div className="relative z-10">
-                      <p className="text-xs uppercase tracking-[0.35em] text-slate-900/70">{story.title}</p>
-                      <h3 className="mt-2 text-lg font-semibold text-slate-950">{story.subtitle}</h3>
-                    </div>
-                    <div className="absolute inset-0 bg-slate-900/20" aria-hidden />
-                  </article>
-                ))}
-              </div>
-            </div>
-
-            <div className="community-card">
-              <form onSubmit={handlePublishPost} className="space-y-4">
-                <div>
-                  <label htmlFor="composer" className="text-sm font-semibold text-slate-200">
-                    Írj valamit a közösségednek
-                  </label>
-                  <textarea
-                    id="composer"
-                    name="composer"
-                    value={composerText}
-                    onChange={handleComposerChange}
-                    rows={4}
-                    placeholder="Milyen hangulatot hozol ma a DinoNetre? #hashtag"
-                    className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+            <article className="community-card space-y-6">
+              <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">
+                    {pressStart.className ? (
+                      <span className={pressStart.className}>Tamagochi</span>
+                    ) : (
+                      "Tamagochi"
+                    )}
+                  </p>
+                  <h1 className="text-2xl font-semibold text-slate-50">{displayName}</h1>
+                  <p className="text-sm text-slate-300">{tamagochiStatus}</p>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                      Aktuális hangulat: {selectedMoodOption.label}
-                    </span>
-                    {moodBadges.map((badge) => (
-                      <span key={badge} className="rounded-full bg-slate-800/60 px-3 py-1 text-xs text-slate-300">
-                        {badge}
-                      </span>
-                    ))}
+                <div
+                  className={`tamagochi-orb bg-gradient-to-br ${selectedMoodOption.gradient}`}
+                  aria-hidden
+                >
+                  <div className="tamagochi-screen">
+                    <div className="tamagochi-pet">
+                      <span className="tamagochi-eye" />
+                      <span className="tamagochi-eye" />
+                      <span className="tamagochi-mouth" />
+                    </div>
                   </div>
+                </div>
+              </header>
+
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <button
-                    type="submit"
-                    className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300"
+                    type="button"
+                    onClick={handleFeed}
+                    className="rounded-2xl border border-amber-300/60 bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30"
                   >
-                    Megosztás
+                    Etetés
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePlay}
+                    className="rounded-2xl border border-fuchsia-300/60 bg-fuchsia-400/20 px-4 py-3 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/30"
+                  >
+                    Játék
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRest}
+                    className="rounded-2xl border border-teal-300/60 bg-teal-400/20 px-4 py-3 text-sm font-semibold text-teal-100 transition hover:bg-teal-400/30"
+                  >
+                    Pihenés
                   </button>
                 </div>
-              </form>
-            </div>
 
-            <div className="space-y-4">
-              {posts.map((post) => {
-                const initials = initialsFromName(post.author);
-                return (
-                  <article key={post.id} className="community-card space-y-4">
-                    <header className="flex items-start gap-3">
-                      <div className={`avatar-ring bg-gradient-to-br ${post.accent}`}>
-                        <span>{initials}</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                          <h3 className="text-base font-semibold text-slate-50">{post.author}</h3>
-                          <span className="text-xs uppercase tracking-[0.35em] text-emerald-200">
-                            {post.mood}
+                <div className="grid gap-4">
+                  {statItems.map((stat) => {
+                    const safeValue = clamp(stat.value);
+                    return (
+                      <div key={stat.id} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2 font-semibold text-slate-100">
+                            <span aria-hidden>{stat.icon}</span>
+                            {stat.label}
                           </span>
+                          <span className="text-slate-300">{Math.round(safeValue)}%</span>
                         </div>
-                        <p className="text-sm text-slate-400">
-                          {post.handle} · {post.timeAgo}
-                        </p>
+                        <div className="h-3 rounded-full bg-slate-900/60">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${stat.accent}`}
+                            style={{ width: `${safeValue}%` }}
+                          />
+                        </div>
                       </div>
-                    </header>
-                    <p className="text-sm leading-relaxed text-slate-200">{post.content}</p>
-                    {post.topics.length > 0 && (
-                      <div className="flex flex-wrap gap-2 text-xs text-emerald-200">
-                        {post.topics.map((topic) => (
-                          <span key={topic} className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm text-slate-300">
-                      <button
-                        type="button"
-                        onClick={() => toggleLike(post.id)}
-                        className={`flex items-center gap-2 rounded-2xl px-3 py-1 transition ${
-                          post.isLiked
-                            ? "bg-emerald-400/20 text-emerald-200"
-                            : "hover:bg-emerald-400/10 hover:text-emerald-100"
-                        }`}
-                      >
-                        <span aria-hidden>{post.isLiked ? "💖" : "🤍"}</span>
-                        <span>{post.likes} szív</span>
-                      </button>
-                      <span>{post.comments} hozzászólás</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-3 text-xs text-slate-300 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-amber-400/30 bg-slate-900/40 p-3">
+                    <p className="font-semibold text-slate-100">Etetések</p>
+                    <p className="text-lg font-semibold text-amber-200">{careStats.meals}</p>
+                  </div>
+                  <div className="rounded-2xl border border-fuchsia-400/30 bg-slate-900/40 p-3">
+                    <p className="font-semibold text-slate-100">Játékok</p>
+                    <p className="text-lg font-semibold text-fuchsia-200">{careStats.plays}</p>
+                  </div>
+                  <div className="rounded-2xl border border-teal-400/30 bg-slate-900/40 p-3">
+                    <p className="font-semibold text-slate-100">Pihenések</p>
+                    <p className="text-lg font-semibold text-teal-200">{careStats.rests}</p>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <section className="community-card space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                Környezet jelentés
+              </h2>
+              <p className="text-sm text-slate-300">
+                {selectedMoodOption.emoji} {selectedMoodOption.description}
+              </p>
+              <p className="text-sm text-slate-300">
+                A kiválasztott hangulat befolyásolja, milyen gyorsan regenerálódik a tamagochi lelke.
+              </p>
+              <ul className="space-y-2 text-sm text-slate-300">
+                <li>Vidám mód extra kedvet ad, de gyorsabban éhezik.</li>
+                <li>Kreatív módban lassabban fogy az energia, ha játszol vele.</li>
+                <li>Nyugodt módban a pihenés hatékonyabb.</li>
+                <li>Nosztalgikus módban a boldogság tovább tart.</li>
+              </ul>
+            </section>
           </section>
 
           <aside className="space-y-6">
-            <section className="community-card">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Felfedezés</h3>
-              <ul className="mt-4 space-y-3 text-sm">
-                {posts.slice(0, 4).map((post) => (
-                  <li key={post.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800/70 bg-slate-900/30 p-3">
-                    <div>
-                      <p className="font-semibold text-slate-100">{post.topics[0]}</p>
-                      <p className="text-xs text-slate-400">{post.author}</p>
-                    </div>
-                    <span className="text-xs text-slate-500">{post.timeAgo}</span>
+            <section className="community-card space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                Társ tamagochik
+              </h3>
+              {isLoadingTamagotchis ? (
+                <p className="text-sm text-slate-400">Betöltés alatt...</p>
+              ) : tamagotchiError ? (
+                <p className="text-sm text-rose-300">{tamagotchiError}</p>
+              ) : otherTamagotchis.length === 0 ? (
+                <p className="text-sm text-slate-400">
+                  Még nincsenek más tamagochik a listán. Adj nevet a sajátodnak a kezdéshez!
+                </p>
+              ) : (
+                <ul className="space-y-3 text-sm">
+                  {otherTamagotchis.map((tamagotchi) => {
+                    const ageText = formatElapsedTime(tamagotchi.createdAt, nowTimestamp);
+                    const birthDate = formatBirthDate(tamagotchi.createdAt);
+                    return (
+                      <li
+                        key={`${tamagotchi.name}-${tamagotchi.createdAt}`}
+                        className="rounded-2xl border border-slate-800/70 bg-slate-900/30 p-3"
+                      >
+                        <p className="font-semibold text-slate-100">{tamagotchi.name}</p>
+                        <p className="text-xs text-emerald-200">Mióta él: {ageText}</p>
+                        {birthDate && (
+                          <p className="text-xs text-slate-400">Kikelés: {birthDate}</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section className="community-card space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                Napló
+              </h3>
+              <ul className="space-y-3 text-sm text-slate-300">
+                {activityLog.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-2xl border border-slate-800/70 bg-slate-900/30 p-3"
+                  >
+                    <p className="font-semibold text-slate-100">{item.message}</p>
+                    <p className="text-xs text-slate-500">{item.timeAgo}</p>
                   </li>
                 ))}
               </ul>
             </section>
 
-            <section className="community-card">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Barát ajánló</h3>
-              <ul className="mt-4 space-y-3 text-sm">
-                {friendSuggestions.map((friend) => (
-                  <li key={friend.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800/70 bg-slate-900/30 p-3">
-                    <div>
-                      <p className="font-semibold text-slate-100">{friend.name}</p>
-                      <p className="text-xs text-slate-400">{friend.handle}</p>
-                      <p className="text-xs text-slate-500">
-                        {friend.sharedInterest} · {friend.mutualCount} közös ismerős
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addActivity(`Beköveted ${friend.name} profilját.`)}
-                      className="rounded-2xl border border-emerald-400/60 px-3 py-1 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/10"
-                    >
-                      Követem
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="community-card">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Közelgő események</h3>
-              <ul className="mt-4 space-y-4 text-sm">
-                {upcomingEvents.map((event) => (
-                  <li key={event.id} className="space-y-2 rounded-2xl border border-slate-800/70 bg-slate-900/30 p-4">
-                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-emerald-200">
-                      <span>{event.day}</span>
-                      <span>{event.time}</span>
-                    </div>
-                    <p className="text-base font-semibold text-slate-50">{event.title}</p>
-                    <p className="text-xs text-slate-400">{event.location}</p>
-                    <p className="text-sm text-slate-300">{event.description}</p>
-                    <button
-                      type="button"
-                      onClick={() => addActivity(`Érdekel: ${event.title}.`)}
-                      className="rounded-2xl bg-emerald-400/20 px-3 py-1 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/30"
-                    >
-                      Jelölöm
-                    </button>
-                  </li>
-                ))}
+            <section className="community-card space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                Gondozási tippek
+              </h3>
+              <ul className="space-y-3 text-sm text-slate-300">
+                <li>
+                  Figyeld a mutatókat: ha bármelyik 30% alá esik, gyorsan cselekedj, különben a
+                  tamagochi elszomorodik.
+                </li>
+                <li>
+                  Kombináld a tevékenységeket: egy játék után jöhet egy rövid pihenés, hogy ne fogyjon ki az energia.
+                </li>
+                <li>
+                  A hangulat modulok között váltogatva egyedi animációkat és reakciókat figyelhetsz meg.
+                </li>
               </ul>
             </section>
           </aside>
