@@ -24,9 +24,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const nameCandidate = (parsedBody as { name?: unknown }).name;
   const rawName =
-    typeof (parsedBody as { name?: unknown }).name === "string"
-      ? (parsedBody as { name?: string }).name.trim()
+    typeof nameCandidate === "string"
+      ? nameCandidate.trim()
       : "";
 
   if (!rawName) {
