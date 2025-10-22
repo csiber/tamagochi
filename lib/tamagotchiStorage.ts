@@ -11,8 +11,14 @@ type TamagochiRecordLike = {
 };
 
 export interface TamagochiBindings {
-  TAMAGOCHI_KV: KVNamespace;
+  TAMAGOCHI_KV?: KVNamespace;
 }
+
+type KvEnabledBindings = Required<Pick<TamagochiBindings, "TAMAGOCHI_KV">>;
+
+const hasKvBinding = (
+  bindings?: Partial<TamagochiBindings>,
+): bindings is KvEnabledBindings => Boolean(bindings?.TAMAGOCHI_KV);
 
 const normaliseName = (value: string) => value.trim();
 
@@ -123,15 +129,16 @@ const writeToMemory = (
 };
 
 const readFromKv = async (
-  bindings: TamagochiBindings,
+  bindings: KvEnabledBindings,
 ): Promise<TamagochiRecord[]> => {
-  const stored = await bindings.TAMAGOCHI_KV.get<TamagochiRecordLike[]>(KV_STORAGE_KEY, {
+  const { TAMAGOCHI_KV } = bindings;
+  const stored = await TAMAGOCHI_KV.get<TamagochiRecordLike[]>(KV_STORAGE_KEY, {
     type: "json",
   });
 
   if (!Array.isArray(stored)) {
     const fallback = cloneRecords(DEFAULT_TAMAGOTCHIS);
-    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
+    await TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 
@@ -139,12 +146,12 @@ const readFromKv = async (
 
   if (sanitised.length === 0) {
     const fallback = cloneRecords(DEFAULT_TAMAGOTCHIS);
-    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
+    await TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 
   if (sanitised.length !== stored.length) {
-    await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(sanitised));
+    await TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(sanitised));
   }
 
   return cloneRecords(sanitised);
@@ -152,12 +159,13 @@ const readFromKv = async (
 
 const writeToKv = async (
   records: Iterable<TamagochiRecordLike>,
-  bindings: TamagochiBindings,
+  bindings: KvEnabledBindings,
 ): Promise<TamagochiRecord[]> => {
+  const { TAMAGOCHI_KV } = bindings;
   const sanitised = sanitiseRecords(records);
   const nextRecords = sanitised.length > 0 ? sanitised : cloneRecords(DEFAULT_TAMAGOTCHIS);
 
-  await bindings.TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(nextRecords));
+  await TAMAGOCHI_KV.put(KV_STORAGE_KEY, JSON.stringify(nextRecords));
 
   return cloneRecords(nextRecords);
 };
@@ -165,8 +173,8 @@ const writeToKv = async (
 const resolveRecords = async (
   bindings?: Partial<TamagochiBindings>,
 ): Promise<TamagochiRecord[]> => {
-  if (bindings?.TAMAGOCHI_KV) {
-    return readFromKv(bindings as TamagochiBindings);
+  if (hasKvBinding(bindings)) {
+    return readFromKv(bindings);
   }
 
   return readFromMemory();
@@ -176,8 +184,8 @@ const persistRecords = async (
   records: Iterable<TamagochiRecordLike>,
   bindings?: Partial<TamagochiBindings>,
 ): Promise<TamagochiRecord[]> => {
-  if (bindings?.TAMAGOCHI_KV) {
-    return writeToKv(records, bindings as TamagochiBindings);
+  if (hasKvBinding(bindings)) {
+    return writeToKv(records, bindings);
   }
 
   return writeToMemory(records);
