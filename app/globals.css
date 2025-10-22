@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
-
 :root {
   --foreground-rgb: 241, 245, 249;
   --screen-inner: #1e293b;
@@ -14,10 +12,6 @@ body {
   color: rgb(var(--foreground-rgb));
   background: radial-gradient(circle at 30% -20%, #1d4ed8 0%, #0f172a 55%, #020617 100%);
   min-height: 100vh;
-}
-
-.pixel-font {
-  font-family: "Press Start 2P", "Courier New", monospace;
 }
 
 .tamagotchi-shell {
