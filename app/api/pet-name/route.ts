@@ -1,4 +1,3 @@
-/* eslint-disable next-on-pages/no-nodejs-runtime */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -7,7 +6,7 @@ import { registerTamagochi } from "@/lib/tamagotchiStorage";
 const NAME_COOKIE = "tamagochi-name";
 const MAX_NAME_LENGTH = 24;
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
   const storedName = request.cookies.get(NAME_COOKIE)?.value ?? null;
@@ -52,9 +51,9 @@ export async function POST(request: NextRequest) {
   try {
     await registerTamagochi(rawName);
   } catch (error) {
-    console.error("Nem sikerült fájlba menteni a tamagochi nevet", error);
+    console.error("Nem sikerült elmenteni a tamagochi nevet", error);
     return NextResponse.json(
-      { error: "Nem sikerült elmenteni a tamagochit az adatfájlba." },
+      { error: "Nem sikerült elmenteni a tamagochit a tárolóba." },
       { status: 500 },
     );
   }
