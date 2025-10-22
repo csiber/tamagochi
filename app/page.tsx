@@ -3,7 +3,7 @@
 "use client";
 
 import type { ChangeEvent, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type AnimationState = "idle" | "eating" | "playing";
 type GameChoice = "kő" | "papír" | "olló";
@@ -63,6 +63,15 @@ export default function Home() {
     ...INITIAL_GAME_STATE,
   });
 
+  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAnimationTimeout = () => {
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+      animationTimeoutRef.current = null;
+    }
+  };
+
   const feedPet = () => {
     if (petState.hunger >= MAX_STAT) {
       return;
@@ -74,8 +83,10 @@ export default function Home() {
       animation: "eating",
     }));
 
-    setTimeout(() => {
+    clearAnimationTimeout();
+    animationTimeoutRef.current = setTimeout(() => {
       setPetState((prevState) => ({ ...prevState, animation: "idle" }));
+      animationTimeoutRef.current = null;
     }, 2000);
   };
 
@@ -90,8 +101,10 @@ export default function Home() {
       animation: "playing",
     }));
 
-    setTimeout(() => {
+    clearAnimationTimeout();
+    animationTimeoutRef.current = setTimeout(() => {
       setPetState((prevState) => ({ ...prevState, animation: "idle" }));
+      animationTimeoutRef.current = null;
     }, 1200);
   };
 
@@ -137,10 +150,21 @@ export default function Home() {
       animation: "playing",
     }));
 
-    setTimeout(() => {
+    clearAnimationTimeout();
+    animationTimeoutRef.current = setTimeout(() => {
       setPetState((prevState) => ({ ...prevState, animation: "idle" }));
+      animationTimeoutRef.current = null;
     }, 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current);
+        animationTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const reduceStatsOverTime = () => {
