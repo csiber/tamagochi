@@ -5,7 +5,7 @@
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { pressStart } from "./layout";
+import { pressStart } from "./fonts";
 
 type AnimationState = "idle" | "eating" | "playing";
 type GameChoice = "kő" | "papír" | "olló";
