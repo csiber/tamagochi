@@ -470,7 +470,7 @@ export default function Home() {
   };
 
   const toggleLike = (postId: number) => {
-    let toggledPost: { author: string; liked: boolean } | null = null;
+    let activityMessage: string | null = null;
 
     setPosts((prevPosts) =>
       prevPosts.map((post) => {
@@ -479,7 +479,10 @@ export default function Home() {
         }
 
         const liked = !post.isLiked;
-        toggledPost = { author: post.author, liked };
+        activityMessage = liked
+          ? `Kedvelted ${post.author} bejegyzését.`
+          : `Levetted a szívet ${post.author} bejegyzéséről.`;
+
         return {
           ...post,
           isLiked: liked,
@@ -488,12 +491,8 @@ export default function Home() {
       }),
     );
 
-    if (toggledPost) {
-      addActivity(
-        toggledPost.liked
-          ? `Kedvelted ${toggledPost.author} bejegyzését.`
-          : `Levetted a szívet ${toggledPost.author} bejegyzéséről.`,
-      );
+    if (activityMessage) {
+      addActivity(activityMessage);
     }
   };
 
