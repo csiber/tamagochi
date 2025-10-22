@@ -11,6 +11,17 @@ import {
 const NAME_COOKIE = "tamagochi-name";
 const MAX_NAME_LENGTH = 24;
 
+const resolveBindings = () => {
+  try {
+    return getRequestContext().env as Partial<TamagochiBindings>;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Cloudflare környezet nem elérhető, in-memory tárolót használunk.", error);
+    }
+    return undefined;
+  }
+};
+
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
@@ -53,7 +64,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const bindings = getRequestContext().env as Partial<TamagochiBindings>;
+  const bindings = resolveBindings();
 
   try {
     await registerTamagochi(rawName, bindings);
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const bindings = getRequestContext().env as Partial<TamagochiBindings>;
+  const bindings = resolveBindings();
   const storedName = request.cookies.get(NAME_COOKIE)?.value ?? "";
 
   let providedName = "";
