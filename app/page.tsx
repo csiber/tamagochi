@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { pressStart } from "./fonts";
+import { useSoundEffects } from "../lib/sound-effects";
 
 type FeedbackType = "success" | "error" | "info";
 
@@ -318,6 +319,8 @@ export default function Home() {
   const [isLoadingTamagotchis, setIsLoadingTamagotchis] = useState(true);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
 
+  const { playSuccess, playError, playNotification } = useSoundEffects();
+
   const warningRef = useRef({ hunger: false, energy: false, happiness: false });
 
   const addActivity = useCallback((message: string) => {
@@ -363,9 +366,10 @@ export default function Home() {
         plays: previous.plays + 1,
       }));
       addActivity(message);
+      playSuccess();
       triggerAnimation("play", 2200);
     },
-    [addActivity, applyStatChanges, triggerAnimation],
+    [addActivity, applyStatChanges, playSuccess, triggerAnimation],
   );
 
   const handleGameMistake = useCallback(
@@ -374,9 +378,10 @@ export default function Home() {
       const finalPenalty = { ...defaultPenalty, ...penalty };
       applyStatChanges(finalPenalty);
       addActivity(message);
+      playError();
       triggerAnimation("alert", 2000);
     },
-    [addActivity, applyStatChanges, triggerAnimation],
+    [addActivity, applyStatChanges, playError, triggerAnimation],
   );
 
   const clearReflexTimeout = useCallback(() => {
@@ -839,6 +844,7 @@ export default function Home() {
         type: "error",
         message: "Adj meg egy nevet a tamagochinak!",
       });
+      playError();
       return;
     }
 
@@ -862,6 +868,7 @@ export default function Home() {
           type: "error",
           message: data.error ?? "Nem sikerült elmenteni a tamagochi nevét.",
         });
+        playError();
         return;
       }
 
@@ -874,6 +881,7 @@ export default function Home() {
         type: "success",
         message: "Siker! A tamagochi neve elmentve.",
       });
+      playSuccess();
       addActivity("Nevet adtál a tamagochinak.");
       void refreshTamagotchis();
     } catch (error) {
@@ -882,6 +890,7 @@ export default function Home() {
         type: "error",
         message: "Ismeretlen hiba történt mentés közben.",
       });
+      playError();
     } finally {
       setIsSavingName(false);
     }
@@ -902,6 +911,7 @@ export default function Home() {
           type: "error",
           message: "Nem sikerült törölni a tamagochi nevét.",
         });
+        playError();
         return;
       }
 
@@ -911,6 +921,7 @@ export default function Home() {
         type: "info",
         message: "A tamagochi neve törlésre került a sessionből.",
       });
+      playNotification();
       addActivity("Eltávolítottad a tamagochi nevét.");
       void refreshTamagotchis();
     } catch (error) {
@@ -919,6 +930,7 @@ export default function Home() {
         type: "error",
         message: "Váratlan hiba történt a törlés közben.",
       });
+      playError();
     } finally {
       setIsClearingName(false);
     }
@@ -947,6 +959,7 @@ export default function Home() {
       meals: previous.meals + 1,
     }));
     addActivity("Finom pixel-ebédet kapott a tamagochi.");
+    playNotification();
     triggerAnimation("eat", 1900);
   };
 
@@ -959,6 +972,7 @@ export default function Home() {
       plays: previous.plays + 1,
     }));
     addActivity("Játékra hívtad a tamagochit.");
+    playNotification();
     triggerAnimation("play", 2000);
   };
 
@@ -970,6 +984,7 @@ export default function Home() {
       rests: previous.rests + 1,
     }));
     addActivity("Lefektetted egy kis pihenésre.");
+    playNotification();
     triggerAnimation("sleep", 2600);
   };
 
@@ -1184,18 +1199,18 @@ export default function Home() {
                   Nevezd el a tamagochit, hogy a történetetek bekerüljön a naplóba.
                 </p>
                 <form onSubmit={handleSaveName} className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <input
                       type="text"
                       value={nameInput}
                       onChange={handleNameInputChange}
                       placeholder="Tamagochi neve"
-                      className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                      className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:h-11"
                       maxLength={32}
                     />
                     <button
                       type="submit"
-                      className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300"
+                      className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300 sm:h-11 sm:px-5"
                       disabled={isSavingName}
                     >
                       {isSavingName ? "Mentés..." : "Mentés"}
