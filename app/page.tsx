@@ -1342,22 +1342,28 @@ export default function Home() {
                   Nevezd el a tamagochit, hogy a történetetek bekerüljön a naplóba.
                 </p>
                 <form onSubmit={handleSaveName} className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={handleNameInputChange}
-                      placeholder="Tamagochi neve"
-                      className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:h-11"
-                      maxLength={32}
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300 sm:h-11 sm:px-5"
-                      disabled={isSavingName}
-                    >
-                      {isSavingName ? "Mentés..." : "Mentés"}
-                    </button>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={handleNameInputChange}
+                        placeholder="Tamagochi neve"
+                        className="w-full rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-2 pr-28 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:h-11"
+                        maxLength={32}
+                        aria-label="Tamagochi neve"
+                      />
+                      <button
+                        type="submit"
+                        className="absolute right-1.5 top-1.5 inline-flex h-[calc(100%-0.75rem)] items-center justify-center rounded-2xl bg-emerald-400 px-4 text-sm font-semibold text-emerald-950 shadow-[0_10px_20px_rgba(16,185,129,0.35)] transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-80 sm:right-2 sm:top-2"
+                        disabled={isSavingName}
+                      >
+                        {isSavingName ? "Mentés..." : "Mentés"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Adj egy különleges nevet, és a gondozói naplóban is kiemelten szerepel majd a történetetek.
+                    </p>
                   </div>
                   <button
                     type="button"
