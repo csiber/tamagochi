@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
-import { registerTamagochi } from "@/lib/tamagotchiStorage";
+import {
+  registerTamagochi,
+  removeTamagochi,
+  type TamagochiBindings,
+} from "@/lib/tamagotchiStorage";
 
 const NAME_COOKIE = "tamagochi-name";
 const MAX_NAME_LENGTH = 24;
@@ -48,8 +53,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const bindings = getRequestContext().env as Partial<TamagochiBindings>;
+
   try {
-    await registerTamagochi(rawName);
+    await registerTamagochi(rawName, bindings);
   } catch (error) {
     console.error("Nem sikerült elmenteni a tamagochi nevet", error);
     return NextResponse.json(
@@ -73,7 +80,35 @@ export async function POST(request: NextRequest) {
   return response;
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const bindings = getRequestContext().env as Partial<TamagochiBindings>;
+  const storedName = request.cookies.get(NAME_COOKIE)?.value ?? "";
+
+  let providedName = "";
+
+  try {
+    const candidate = (await request.json()) as { name?: unknown };
+    if (typeof candidate?.name === "string") {
+      providedName = candidate.name.trim();
+    }
+  } catch (error) {
+    // Ha nincs törzs, figyelmen kívül hagyjuk a hibát.
+  }
+
+  const targetName = storedName || providedName;
+
+  if (targetName) {
+    try {
+      await removeTamagochi(targetName, bindings);
+    } catch (error) {
+      console.error("Nem sikerült eltávolítani a tamagochit a tárolóból", error);
+      return NextResponse.json(
+        { error: "Nem sikerült törölni a tamagochit a tárolóból." },
+        { status: 500 },
+      );
+    }
+  }
+
   const response = NextResponse.json({ name: null });
 
   response.cookies.set({
