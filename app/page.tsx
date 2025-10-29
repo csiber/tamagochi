@@ -1311,8 +1311,14 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="community-gradient">
+    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+      <div className="winter-glow" aria-hidden="true" />
+      <div className="winter-snow" aria-hidden="true">
+        <div className="snow-layer snow-layer--far" />
+        <div className="snow-layer snow-layer--mid" />
+        <div className="snow-layer snow-layer--near" />
+      </div>
+      <div className="community-gradient relative z-10">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 lg:grid lg:grid-cols-[260px_1.35fr_320px] lg:px-6">
           <aside className="space-y-6">
             <section className="community-card space-y-6">
