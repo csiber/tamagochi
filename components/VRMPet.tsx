@@ -20,20 +20,28 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
     // @ts-ignore - Ignore type mismatch between three-stdlib and three-vrm types during build
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
-    // To use your own VRoid model:
-    // 1. Place your .vrm file in the /public folder (e.g., /public/pet.vrm)
-    // 2. Change the url below to "/pet.vrm"
-    const url = vrmUrl || "https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/three-vrm-girl.vrm";
+    // Reliable CDN link for a sample VRM model (Seed-v1 from VRM consortium)
+    const url = vrmUrl || "https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@master/samples/Seed-v1/Seed-v1.vrm";
 
     loader.load(
       url,
       (gltf) => {
         const vrmData = gltf.userData.vrm as VRM;
-        VRMUtils.rotateVRM0(vrmData); // Fix for VRM 0.0 models orientation
-        setVrm(vrmData);
+        if (vrmData) {
+          VRMUtils.rotateVRM0(vrmData);
+          setVrm(vrmData);
+          console.log("VRM model loaded successfully!");
+        }
       },
-      undefined,
-      (error) => console.error("Error loading VRM:", error)
+      (progress) => console.log(`Loading VRM: ${Math.round((progress.loaded / progress.total) * 100)}%`),
+      (error) => {
+        console.error("Error loading VRM:", error);
+        // Fallback to another character if the first one fails
+        if (!vrmUrl) {
+           console.log("Attempting secondary fallback model...");
+           loader.load("https://raw.githubusercontent.com/vrm-c/vrm-specification/master/samples/Seed-v1/Seed-v1.vrm", (g) => setVrm(g.userData.vrm));
+        }
+      }
     );
   }, [vrmUrl]);
 
