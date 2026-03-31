@@ -20,17 +20,11 @@ import { ActionButtons } from "@/components/ActionButtons";
 import { ActivityLog } from "@/components/ActivityLog";
 import { MoodSelector } from "@/components/MoodSelector";
 import { MiniGames } from "@/components/MiniGames";
-import { CommunityList } from "@/components/CommunityList";
+import { PartnerLinks } from "@/components/PartnerLinks";
 import { useSoundEffects } from "@/lib/sound-effects";
 
 // Types
 type PetAnimation = "idle" | "eat" | "play" | "sleep" | "alert";
-type GameType = "reflex" | "hangulat" | "kincs";
-
-interface TamagochiInfo {
-  name: string;
-  createdAt: string;
-}
 
 interface ActivityItem {
   id: number;
@@ -46,7 +40,7 @@ interface MoodOption {
 }
 
 // Constants
-const STORAGE_KEY = "tamagochi-state-v2";
+const STORAGE_KEY = "tamagochi-state-v3";
 const MAX_LOG_ITEMS = 10;
 
 const moodOptions: MoodOption[] = [
@@ -65,8 +59,6 @@ export default function Home() {
   const [petAnimation, setPetAnimation] = useState<PetAnimation>("idle");
   const [stats, setStats] = useState({ hunger: 75, energy: 75, happiness: 75 });
   const [activityLog, setActivityLog] = useState<ActivityItem[]>([]);
-  const [community, setCommunity] = useState<TamagochiInfo[]>([]);
-  const [isLoadingCommunity, setIsLoadingCommunity] = useState(true);
   const [now, setNow] = useState(Date.now());
 
   const { playSuccess, playError, playNotification } = useSoundEffects();
@@ -115,7 +107,7 @@ export default function Home() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setStats(parsed.stats);
+        setStats(parsed.stats || { hunger: 75, energy: 75, happiness: 75 });
         setProfileName(parsed.profileName || "");
         setSelectedMood(parsed.selectedMood || "vidam");
         setActivityLog(parsed.activityLog || []);
@@ -141,21 +133,6 @@ export default function Home() {
       }));
       setNow(Date.now());
     }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Community Sync
-  useEffect(() => {
-    const fetchCommunity = async () => {
-      try {
-        const res = await fetch("/api/tamagotchis");
-        const data = (await res.json()) as { tamagotchis?: TamagochiInfo[] };
-        if (data.tamagotchis) setCommunity(data.tamagotchis);
-      } catch (e) { console.error("Sync failed", e); }
-      finally { setIsLoadingCommunity(false); }
-    };
-    fetchCommunity();
-    const interval = setInterval(fetchCommunity, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -208,19 +185,19 @@ export default function Home() {
             label="Éhség" 
             value={stats.hunger} 
             icon="🍽️" 
-            colorClass="bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]" 
+            colorClass="bg-amber-500" 
           />
           <StatCard 
             label="Boldogság" 
             value={stats.happiness} 
             icon="🎉" 
-            colorClass="bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.5)]" 
+            colorClass="bg-pink-500" 
           />
           <StatCard 
             label="Energia" 
             value={stats.energy} 
             icon="⚡" 
-            colorClass="bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" 
+            colorClass="bg-emerald-500" 
           />
           <ActionButtons 
             onFeed={handleFeed} 
@@ -228,7 +205,7 @@ export default function Home() {
             onRest={handleRest} 
             disabled={petAnimation !== 'idle'}
           />
-          <CommunityList tamagotchis={community} isLoading={isLoadingCommunity} />
+          <PartnerLinks />
         </div>
 
         {/* Center Column: The Pet */}
