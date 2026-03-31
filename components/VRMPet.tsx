@@ -18,7 +18,9 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
-    // Fallback model if vrmUrl is not provided
+    // To use your own VRoid model:
+    // 1. Place your .vrm file in the /public folder (e.g., /public/pet.vrm)
+    // 2. Change the url below to "/pet.vrm"
     const url = vrmUrl || "https://pixiv.github.io/three-vrm/packages/three-vrm/examples/models/three-vrm-girl.vrm";
 
     loader.load(
