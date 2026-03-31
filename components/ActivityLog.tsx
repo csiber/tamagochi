@@ -10,7 +10,7 @@ interface ActivityLogProps {
 
 export const ActivityLog = ({ activities }: ActivityLogProps) => {
   return (
-    <div className="bento-card flex flex-col gap-4 h-full">
+    <div className="bento-card flex flex-col gap-4 flex-1 min-h-[200px]">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Aktivitási Napló</h3>
         <div className="flex gap-1">

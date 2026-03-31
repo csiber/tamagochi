@@ -20,90 +20,75 @@ body {
 }
 
 .bento-card {
-  @apply relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md;
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  @apply relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 backdrop-blur-xl;
+  box-shadow: 
+    0 10px 30px -10px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .bento-card:hover {
-  @apply border-white/20 bg-white/[0.05];
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.3);
+  @apply border-white/20 bg-white/[0.04];
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.avatar-initials {
-  @apply flex h-12 w-12 items-center justify-center rounded-2xl font-bold tracking-tighter;
-  background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
-  color: #0b0d11;
+.tamagochi-orb {
+  @apply relative flex aspect-square w-full max-w-[300px] items-center justify-center rounded-full;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  box-shadow: 
+    0 40px 80px -20px rgba(0, 0, 0, 0.8),
+    inset 0 -20px 40px rgba(0, 0, 0, 0.5),
+    inset 0 20px 40px rgba(255, 255, 255, 0.1);
+  perspective: 1000px;
+}
+
+/* 3D Entity Look */
+.tamagochi-pet {
+  @apply relative flex h-3/5 w-3/4 items-center justify-around rounded-full p-4;
+  background: radial-gradient(circle at 30% 30%, #60a5fa 0%, #2563eb 60%, #1e3a8a 100%);
+  box-shadow: 
+    inset -10px -10px 30px rgba(0, 0, 0, 0.5),
+    inset 10px 10px 30px rgba(255, 255, 255, 0.3),
+    0 20px 40px rgba(0, 0, 0, 0.4);
+  animation: pet-float 4s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+/* Glossy Reflection */
+.tamagochi-pet::before {
+  content: "";
+  @apply absolute left-[15%] top-[10%] h-[30%] w-[40%] rounded-full opacity-40;
+  background: linear-gradient(135deg, white 0%, transparent 80%);
+  filter: blur(2px);
+}
+
+@keyframes pet-float {
+  0%, 100% { transform: translateY(0) rotateX(5deg) rotateY(-5deg); }
+  50% { transform: translateY(-15px) rotateX(-5deg) rotateY(5deg); }
 }
 
 .stat-track {
-  @apply h-2 w-full overflow-hidden rounded-full bg-white/5;
+  @apply h-3 w-full overflow-hidden rounded-full bg-black/40;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .stat-fill {
   @apply h-full rounded-full transition-all duration-1000 ease-out;
-}
-
-.tamagochi-orb {
-  @apply relative flex aspect-square w-full max-w-[280px] items-center justify-center rounded-full border border-white/10 p-4;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.05), transparent 70%);
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(16, 185, 129, 0.1);
-  animation: orb-float 6s ease-in-out infinite;
-}
-
-.tamagochi-screen {
-  @apply relative flex h-[85%] w-[85%] items-center justify-center overflow-hidden rounded-[38%];
-  background: #1e293b;
-  border: 4px solid #0f172a;
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
-}
-
-.tamagochi-pet {
-  @apply relative flex h-3/5 w-3/4 items-center justify-between rounded-[45%] p-4;
-  background: linear-gradient(160deg, #60a5fa, #3b82f6);
-  box-shadow: inset 0 -4px 12px rgba(0, 0, 0, 0.3);
-  animation: pet-bounce 4s ease-in-out infinite;
-}
-
-@keyframes orb-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes pet-bounce {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-5%) scale(1.02); }
-}
-
-.press-start {
-  font-family: var(--font-press-start), cursive;
-}
-
-.pixel-btn {
-  @apply rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold transition-all active:scale-95;
-}
-
-.pixel-btn-primary {
-  @apply bg-emerald-500 text-emerald-950 hover:bg-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)];
-}
-
-.pixel-btn-secondary {
-  @apply bg-white/5 text-white hover:bg-white/10;
-}
-
-@keyframes eye-blink {
-  0%, 90%, 100% { transform: scaleY(1); }
-  95% { transform: scaleY(0.1); }
+  box-shadow: 0 0 15px currentColor;
 }
 
 .eye {
-  @apply h-4 w-3 rounded-full bg-slate-900;
-  animation: eye-blink 5s infinite;
+  @apply h-5 w-4 rounded-full bg-slate-950;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: eye-blink 4s infinite;
 }
 
 .mouth {
-  @apply absolute bottom-3 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full bg-slate-900/50;
+  @apply absolute bottom-4 left-1/2 h-2 w-8 -translate-x-1/2 rounded-full bg-slate-950/40;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 @layer utilities {
