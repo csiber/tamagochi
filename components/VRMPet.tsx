@@ -22,8 +22,8 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
 
     const urls = [
       vrmUrl,
-      "https://vrm-c.github.io/vrm-sample-models/vroid/vrm/Seed-v1.vrm",
-      "https://raw.githubusercontent.com/vrm-c/vrm-sample-models/master/vroid/vrm/Seed-v1.vrm"
+      "/Twinkle_Yulelog.vrm",
+      "https://vrm-c.github.io/vrm-sample-models/vroid/vrm/Seed-v1.vrm"
     ].filter(Boolean) as string[];
 
     const tryLoad = (index: number) => {
