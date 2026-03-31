@@ -20,56 +20,85 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
     // @ts-ignore - Ignore type mismatch between three-stdlib and three-vrm types during build
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
-    // Verified stable sample model from the official VRM sample models repository
-    const url = vrmUrl || "https://raw.githubusercontent.com/vrm-c/vrm-sample-models/master/vroid/vrm/Seed-v1.vrm";
+    const urls = [
+      vrmUrl,
+      "https://vrm-c.github.io/vrm-sample-models/vroid/vrm/Seed-v1.vrm",
+      "https://raw.githubusercontent.com/vrm-c/vrm-sample-models/master/vroid/vrm/Seed-v1.vrm"
+    ].filter(Boolean) as string[];
 
-    loader.load(
-      url,
-      (gltf) => {
-        // @ts-ignore
-        const vrmData = gltf.userData.vrm as VRM;
-        if (vrmData) {
-          VRMUtils.rotateVRM0(vrmData);
-          setVrm(vrmData);
-          console.log("VRM model loaded!");
-        }
-      },
-      undefined,
-      (error) => {
-        console.error("VRM Load Error, showing fallback mesh:", error);
+    const tryLoad = (index: number) => {
+      if (index >= urls.length) {
+        console.error("All VRM sources failed. Using procedural fallback.");
+        return;
       }
-    );
+
+      loader.load(
+        urls[index]!,
+        (gltf) => {
+          // @ts-ignore
+          const vrmData = gltf.userData.vrm as VRM;
+          if (vrmData) {
+            VRMUtils.rotateVRM0(vrmData);
+            setVrm(vrmData);
+          }
+        },
+        undefined,
+        () => tryLoad(index + 1)
+      );
+    };
+
+    tryLoad(0);
   }, [vrmUrl]);
 
   useFrame((state, delta) => {
-    if (!vrm) return;
     const time = state.clock.getElapsedTime();
     
-    if (animation === "sleep") {
-      vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(0.4, 0, 0);
-      vrm.expressionManager?.setValue("relaxed", 1.0);
-      vrm.expressionManager?.setValue("blink", 1.0);
-    } else if (animation === "eat") {
-      vrm.expressionManager?.setValue("aa", Math.sin(time * 10) * 0.5 + 0.5);
-      vrm.expressionManager?.setValue("happy", 1.0);
-    } else if (animation === "play") {
-      vrm.humanoid?.getRawBoneNode("leftUpperArm")?.rotation.set(0, 0, Math.sin(time * 5) + 1);
-      vrm.humanoid?.getRawBoneNode("rightUpperArm")?.rotation.set(0, 0, -Math.sin(time * 5) - 1);
-      vrm.expressionManager?.setValue("happy", 1.0);
-    } else {
-      vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(Math.sin(time) * 0.1, 0, 0);
-      vrm.expressionManager?.setValue("blink", Math.sin(time * 0.5) > 0.98 ? 1.0 : 0);
+    if (vrm) {
+      if (animation === "sleep") {
+        vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(0.4, 0, 0);
+        vrm.expressionManager?.setValue("relaxed", 1.0);
+        vrm.expressionManager?.setValue("blink", 1.0);
+      } else if (animation === "eat") {
+        vrm.expressionManager?.setValue("aa", Math.sin(time * 10) * 0.5 + 0.5);
+        vrm.expressionManager?.setValue("happy", 1.0);
+      } else if (animation === "play") {
+        vrm.humanoid?.getRawBoneNode("leftUpperArm")?.rotation.set(0, 0, Math.sin(time * 5) + 1);
+        vrm.humanoid?.getRawBoneNode("rightUpperArm")?.rotation.set(0, 0, -Math.sin(time * 5) - 1);
+        vrm.expressionManager?.setValue("happy", 1.0);
+      } else {
+        vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(Math.sin(time) * 0.1, 0, 0);
+        vrm.expressionManager?.setValue("blink", Math.sin(time * 0.5) > 0.98 ? 1.0 : 0);
+      }
+      vrm.update(delta);
     }
-    vrm.update(delta);
   });
 
   if (!vrm) {
-    // Elegant 3D Placeholder while loading or if load fails
+    // A cute procedural 'Pixel Pet' fallback
     return (
-      <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[0.5, 32, 32]} />
-        <meshStandardMaterial color="#3b82f6" roughness={0.1} metalness={0.8} />
-      </mesh>
+      <group position={[0, -0.5, 0]} rotation={[0, Math.sin(Date.now() / 1000) * 0.2, 0]}>
+        {/* Body */}
+        <mesh position={[0, 0.5, 0]}>
+          <boxGeometry args={[0.8, 0.8, 0.8]} />
+          <meshStandardMaterial color="#3b82f6" roughness={0.2} metalness={0.5} />
+        </mesh>
+        {/* Head */}
+        <mesh position={[0, 1.1, 0.1]}>
+          <boxGeometry args={[0.6, 0.5, 0.5]} />
+          <meshStandardMaterial color="#60a5fa" />
+        </mesh>
+        {/* Eyes */}
+        <mesh position={[-0.15, 1.2, 0.35]}>
+          <sphereGeometry args={[0.05, 16, 16]} />
+          <meshStandardMaterial color="white" />
+        </mesh>
+        <mesh position={[0.15, 1.2, 0.35]}>
+          <sphereGeometry args={[0.05, 16, 16]} />
+          <meshStandardMaterial color="white" />
+        </mesh>
+        {/* Glowing Core */}
+        <pointLight position={[0, 0.5, 0.5]} color="#60a5fa" intensity={2} distance={2} />
+      </group>
     );
   }
 
