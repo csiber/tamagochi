@@ -143,7 +143,7 @@ export default function Home() {
     const fetchCommunity = async () => {
       try {
         const res = await fetch("/api/tamagotchis");
-        const data = await res.json();
+        const data = (await res.json()) as { tamagotchis?: TamagochiInfo[] };
         if (data.tamagotchis) setCommunity(data.tamagotchis);
       } catch (e) { console.error("Sync failed", e); }
       finally { setIsLoadingCommunity(false); }
