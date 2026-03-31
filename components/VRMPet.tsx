@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+// Use GLTFLoader from three-stdlib for better compatibility and TS support
+import { GLTFLoader } from "three-stdlib";
 import * as THREE from "three";
 
 interface VRMPetProps {
