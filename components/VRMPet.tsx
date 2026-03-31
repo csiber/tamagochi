@@ -20,38 +20,31 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
     // @ts-ignore - Ignore type mismatch between three-stdlib and three-vrm types during build
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
-    // Reliable CDN link for a sample VRM model (Seed-v1 from VRM consortium)
-    const url = vrmUrl || "https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@master/samples/Seed-v1/Seed-v1.vrm";
+    // Verified stable sample model from the official VRM sample models repository
+    const url = vrmUrl || "https://raw.githubusercontent.com/vrm-c/vrm-sample-models/master/vroid/vrm/Seed-v1.vrm";
 
     loader.load(
       url,
       (gltf) => {
+        // @ts-ignore
         const vrmData = gltf.userData.vrm as VRM;
         if (vrmData) {
           VRMUtils.rotateVRM0(vrmData);
           setVrm(vrmData);
-          console.log("VRM model loaded successfully!");
+          console.log("VRM model loaded!");
         }
       },
-      (progress) => console.log(`Loading VRM: ${Math.round((progress.loaded / progress.total) * 100)}%`),
+      undefined,
       (error) => {
-        console.error("Error loading VRM:", error);
-        // Fallback to another character if the first one fails
-        if (!vrmUrl) {
-           console.log("Attempting secondary fallback model...");
-           loader.load("https://raw.githubusercontent.com/vrm-c/vrm-specification/master/samples/Seed-v1/Seed-v1.vrm", (g) => setVrm(g.userData.vrm));
-        }
+        console.error("VRM Load Error, showing fallback mesh:", error);
       }
     );
   }, [vrmUrl]);
 
   useFrame((state, delta) => {
     if (!vrm) return;
-
-    // Simple idle breathing / swaying
     const time = state.clock.getElapsedTime();
     
-    // Smooth transitions based on animation state
     if (animation === "sleep") {
       vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(0.4, 0, 0);
       vrm.expressionManager?.setValue("relaxed", 1.0);
@@ -63,18 +56,24 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
       vrm.humanoid?.getRawBoneNode("leftUpperArm")?.rotation.set(0, 0, Math.sin(time * 5) + 1);
       vrm.humanoid?.getRawBoneNode("rightUpperArm")?.rotation.set(0, 0, -Math.sin(time * 5) - 1);
       vrm.expressionManager?.setValue("happy", 1.0);
-      vrm.expressionManager?.setValue("blink", 0);
     } else {
-      // Idle
       vrm.humanoid?.getRawBoneNode("neck")?.rotation.set(Math.sin(time) * 0.1, 0, 0);
-      vrm.expressionManager?.setValue("relaxed", 0.2);
-      vrm.expressionManager?.setValue("blink", Math.sin(time * 0.5) > 0.95 ? 1.0 : 0);
+      vrm.expressionManager?.setValue("blink", Math.sin(time * 0.5) > 0.98 ? 1.0 : 0);
     }
-
     vrm.update(delta);
   });
 
-  return vrm ? <primitive object={vrm.scene} position={[0, -1, 0]} scale={[1, 1, 1]} /> : null;
+  if (!vrm) {
+    // Elegant 3D Placeholder while loading or if load fails
+    return (
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.5, 32, 32]} />
+        <meshStandardMaterial color="#3b82f6" roughness={0.1} metalness={0.8} />
+      </mesh>
+    );
+  }
+
+  return <primitive object={vrm.scene} position={[0, -1, 0]} scale={[1, 1, 1]} />;
 };
 
 export const VRMPet = (props: VRMPetProps) => {
