@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -8,7 +9,12 @@ import {
   useState,
 } from "react";
 
-import { PetDisplay } from "@/components/PetDisplay";
+// Dynamically import PetDisplay with SSR disabled
+const PetDisplay = dynamic(() => import("@/components/PetDisplay").then(mod => mod.PetDisplay), { 
+  ssr: false,
+  loading: () => <div className="flex h-full min-h-[400px] items-center justify-center text-slate-500 uppercase tracking-widest text-xs">3D Entitás ébredése...</div>
+});
+
 import { StatCard } from "@/components/StatCard";
 import { ActionButtons } from "@/components/ActionButtons";
 import { ActivityLog } from "@/components/ActivityLog";
