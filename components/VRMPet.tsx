@@ -17,6 +17,7 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
 
   useEffect(() => {
     const loader = new GLTFLoader();
+    // @ts-ignore - Ignore type mismatch between three-stdlib and three-vrm types during build
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
     // To use your own VRoid model:
