@@ -10,26 +10,16 @@ interface VRMPetProps {
   vrmUrl?: string;
 }
 
-function lerpEuler(
-  bone: THREE.Object3D | null | undefined,
-  target: [number, number, number],
-  alpha: number
-) {
+function lerpEuler(bone: THREE.Object3D | null | undefined, target: [number, number, number], alpha: number) {
   if (!bone) return;
   bone.rotation.x = THREE.MathUtils.lerp(bone.rotation.x, target[0], alpha);
   bone.rotation.y = THREE.MathUtils.lerp(bone.rotation.y, target[1], alpha);
   bone.rotation.z = THREE.MathUtils.lerp(bone.rotation.z, target[2], alpha);
 }
 
-function lerpExpression(
-  mgr: VRM["expressionManager"],
-  name: string,
-  target: number,
-  alpha: number
-) {
+function lerpExpr(mgr: VRM["expressionManager"], name: string, target: number, alpha: number) {
   if (!mgr) return;
-  const current = mgr.getValue(name) ?? 0;
-  mgr.setValue(name, THREE.MathUtils.lerp(current, target, alpha));
+  mgr.setValue(name, THREE.MathUtils.lerp(mgr.getValue(name) ?? 0, target, alpha));
 }
 
 const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
@@ -37,36 +27,31 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
   const [loaded, setLoaded] = useState(false);
   const { camera } = useThree();
 
-  const blinkTimerRef = useRef(0);
-  const nextBlinkRef = useRef(3);
-  const isBlinkingRef = useRef(false);
-  const blinkPhaseRef = useRef(0);
-  const idleSwayPhaseRef = useRef(Math.random() * Math.PI * 2);
+  const blinkTimer = useRef(0);
+  const nextBlink = useRef(3 + Math.random() * 3);
+  const isBlinking = useRef(false);
+  const blinkPhase = useRef(0);
+  const swayOffset = useRef(Math.random() * Math.PI * 2);
 
   useEffect(() => {
     const loader = new GLTFLoader();
     // @ts-ignore – three-stdlib / @types/three KTX2Loader type mismatch
     loader.register((parser) => new VRMLoaderPlugin(parser));
     const urls = [vrmUrl, "/Twinkle_Yulelog.vrm"].filter(Boolean) as string[];
-    const tryLoad = (index: number) => {
-      if (index >= urls.length) return;
-      loader.load(
-        urls[index]!,
-        (gltf) => {
-          const vrmData = gltf.userData.vrm as VRM;
-          if (vrmData) {
-            VRMUtils.rotateVRM0(vrmData);
-            const leftArm = vrmData.humanoid?.getNormalizedBoneNode("leftUpperArm");
-            const rightArm = vrmData.humanoid?.getNormalizedBoneNode("rightUpperArm");
-            if (leftArm) leftArm.rotation.z = 1.1;
-            if (rightArm) rightArm.rotation.z = -1.1;
-            setVrm(vrmData);
-            setLoaded(true);
-          }
-        },
-        undefined,
-        () => tryLoad(index + 1)
-      );
+    const tryLoad = (i: number) => {
+      if (i >= urls.length) return;
+      loader.load(urls[i]!, (gltf) => {
+        const v = gltf.userData.vrm as VRM;
+        if (v) {
+          VRMUtils.rotateVRM0(v);
+          const la = v.humanoid?.getNormalizedBoneNode("leftUpperArm");
+          const ra = v.humanoid?.getNormalizedBoneNode("rightUpperArm");
+          if (la) la.rotation.z = 1.1;
+          if (ra) ra.rotation.z = -1.1;
+          setVrm(v);
+          setLoaded(true);
+        }
+      }, undefined, () => tryLoad(i + 1));
     };
     tryLoad(0);
   }, [vrmUrl]);
@@ -76,128 +61,119 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
     const t = state.clock.getElapsedTime();
     const fast = Math.min(delta * 9, 1);
     const slow = Math.min(delta * 3, 1);
+    const o = swayOffset.current;
 
-    const breathCycle = Math.sin(t * 1.2 + idleSwayPhaseRef.current);
-    const swayCycle = Math.sin(t * 0.4 + idleSwayPhaseRef.current);
-    const microSway = Math.sin(t * 0.8 + idleSwayPhaseRef.current * 1.3);
+    const breath = Math.sin(t * 1.2 + o);
+    const sway = Math.sin(t * 0.4 + o);
+    const micro = Math.sin(t * 0.8 + o * 1.3);
 
-    const hips = vrm.humanoid?.getNormalizedBoneNode("hips");
-    const spine = vrm.humanoid?.getNormalizedBoneNode("spine");
-    const chest = vrm.humanoid?.getNormalizedBoneNode("chest");
-    const neck = vrm.humanoid?.getNormalizedBoneNode("neck");
-    const leftUpperArm = vrm.humanoid?.getNormalizedBoneNode("leftUpperArm");
-    const rightUpperArm = vrm.humanoid?.getNormalizedBoneNode("rightUpperArm");
-    const leftLowerArm = vrm.humanoid?.getNormalizedBoneNode("leftLowerArm");
-    const rightLowerArm = vrm.humanoid?.getNormalizedBoneNode("rightLowerArm");
-    const leftHand = vrm.humanoid?.getNormalizedBoneNode("leftHand");
-    const rightHand = vrm.humanoid?.getNormalizedBoneNode("rightHand");
-    const leftUpperLeg = vrm.humanoid?.getNormalizedBoneNode("leftUpperLeg");
-    const rightUpperLeg = vrm.humanoid?.getNormalizedBoneNode("rightUpperLeg");
+    const bone = (name: string) => vrm.humanoid?.getNormalizedBoneNode(name as any);
 
     // Auto-blink
-    blinkTimerRef.current += delta;
-    if (!isBlinkingRef.current && blinkTimerRef.current > nextBlinkRef.current) {
-      isBlinkingRef.current = true;
-      blinkPhaseRef.current = 0;
-      nextBlinkRef.current = blinkTimerRef.current + 2 + Math.random() * 4;
+    blinkTimer.current += delta;
+    if (!isBlinking.current && blinkTimer.current > nextBlink.current) {
+      isBlinking.current = true; blinkPhase.current = 0;
+      nextBlink.current = blinkTimer.current + 2 + Math.random() * 4;
     }
-    let blinkValue = 0;
-    if (isBlinkingRef.current) {
-      blinkPhaseRef.current += delta * 12;
-      blinkValue = Math.max(0, Math.sin(blinkPhaseRef.current * Math.PI));
-      if (blinkPhaseRef.current >= 1) { isBlinkingRef.current = false; blinkValue = 0; }
+    let blinkVal = 0;
+    if (isBlinking.current) {
+      blinkPhase.current += delta * 12;
+      blinkVal = Math.max(0, Math.sin(blinkPhase.current * Math.PI));
+      if (blinkPhase.current >= 1) { isBlinking.current = false; blinkVal = 0; }
     }
 
     // LookAt
-    const lookTarget = Math.sin(t * 0.15) > 0.7
-      ? new THREE.Vector3(Math.sin(t * 0.3) * 3, 1.2, 3)
-      : camera.position;
-    vrm.lookAt?.lookAt(lookTarget);
+    vrm.lookAt?.lookAt(
+      Math.sin(t * 0.15) > 0.7
+        ? new THREE.Vector3(Math.sin(t * 0.3) * 3, 1.2, 3)
+        : camera.position
+    );
+
+    const hips = bone("hips");
 
     if (animation === "sleep") {
       if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, 0, slow); hips.position.x = THREE.MathUtils.lerp(hips.position.x, 0, slow); }
-      lerpEuler(spine, [0.05, 0, 0], slow);
-      lerpEuler(chest, [0.05, 0, 0], slow);
-      lerpEuler(neck, [0.5, 0, 0], slow);
-      lerpEuler(leftUpperArm, [0, 0, 1.1], slow);
-      lerpEuler(rightUpperArm, [0, 0, -1.1], slow);
-      lerpEuler(leftLowerArm, [0, 0, 0.1], slow);
-      lerpEuler(rightLowerArm, [0, 0, -0.1], slow);
-      lerpExpression(vrm.expressionManager, "blink", 1.0, slow);
-      lerpExpression(vrm.expressionManager, "relaxed", 0.8, slow);
-      lerpExpression(vrm.expressionManager, "happy", 0.2, slow);
-      lerpExpression(vrm.expressionManager, "aa", 0, fast);
-      lerpExpression(vrm.expressionManager, "surprised", 0, fast);
+      lerpEuler(bone("spine"), [0.05, 0, 0], slow);
+      lerpEuler(bone("chest"), [0.05, 0, 0], slow);
+      lerpEuler(bone("neck"), [0.5, 0, 0], slow);
+      lerpEuler(bone("leftUpperArm"), [0, 0, 1.1], slow);
+      lerpEuler(bone("rightUpperArm"), [0, 0, -1.1], slow);
+      lerpEuler(bone("leftLowerArm"), [0, 0, 0.1], slow);
+      lerpEuler(bone("rightLowerArm"), [0, 0, -0.1], slow);
+      lerpExpr(vrm.expressionManager, "blink", 1.0, slow);
+      lerpExpr(vrm.expressionManager, "relaxed", 0.8, slow);
+      lerpExpr(vrm.expressionManager, "happy", 0.2, slow);
+      lerpExpr(vrm.expressionManager, "aa", 0, fast);
+      lerpExpr(vrm.expressionManager, "surprised", 0, fast);
 
     } else if (animation === "eat") {
-      const chewAmt = Math.max(0, Math.sin(t * 12)) * 0.7;
-      if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, swayCycle * 0.005, fast); hips.position.x = THREE.MathUtils.lerp(hips.position.x, swayCycle * 0.01, fast); }
-      lerpEuler(spine, [0.05, 0, 0], fast);
-      lerpEuler(chest, [0.05 + chewAmt * 0.05, 0, 0], fast);
-      lerpEuler(neck, [-0.1 - chewAmt * 0.1, 0, 0], fast);
-      lerpEuler(leftUpperArm, [-0.3, 0, 0.9], fast);
-      lerpEuler(rightUpperArm, [-0.3, 0, -0.9], fast);
-      lerpEuler(leftLowerArm, [0.8, 0, 0], fast);
-      lerpEuler(rightLowerArm, [0.8, 0, 0], fast);
-      lerpEuler(leftHand, [0, 0, 0.2], fast);
-      lerpEuler(rightHand, [0, 0, -0.2], fast);
-      lerpExpression(vrm.expressionManager, "aa", chewAmt, fast);
-      lerpExpression(vrm.expressionManager, "happy", 0.8, fast);
-      lerpExpression(vrm.expressionManager, "blink", blinkValue, fast);
-      lerpExpression(vrm.expressionManager, "relaxed", 0.3, fast);
-      lerpExpression(vrm.expressionManager, "surprised", 0, fast);
+      const chew = Math.max(0, Math.sin(t * 12)) * 0.7;
+      if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, sway * 0.005, fast); hips.position.x = THREE.MathUtils.lerp(hips.position.x, sway * 0.01, fast); }
+      lerpEuler(bone("spine"), [0.05, 0, 0], fast);
+      lerpEuler(bone("chest"), [0.05 + chew * 0.05, 0, 0], fast);
+      lerpEuler(bone("neck"), [-0.1 - chew * 0.1, 0, 0], fast);
+      lerpEuler(bone("leftUpperArm"), [-0.3, 0, 0.9], fast);
+      lerpEuler(bone("rightUpperArm"), [-0.3, 0, -0.9], fast);
+      lerpEuler(bone("leftLowerArm"), [0.8, 0, 0], fast);
+      lerpEuler(bone("rightLowerArm"), [0.8, 0, 0], fast);
+      lerpEuler(bone("leftHand"), [0, 0, 0.2], fast);
+      lerpEuler(bone("rightHand"), [0, 0, -0.2], fast);
+      lerpExpr(vrm.expressionManager, "aa", chew, fast);
+      lerpExpr(vrm.expressionManager, "happy", 0.8, fast);
+      lerpExpr(vrm.expressionManager, "blink", blinkVal, fast);
+      lerpExpr(vrm.expressionManager, "relaxed", 0.3, fast);
+      lerpExpr(vrm.expressionManager, "surprised", 0, fast);
 
     } else if (animation === "play") {
-      const jumpCycle = Math.abs(Math.sin(t * 6));
-      const waveCycle = Math.sin(t * 8);
-      if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, jumpCycle * 0.12, fast); hips.position.x = THREE.MathUtils.lerp(hips.position.x, Math.sin(t * 3) * 0.03, fast); }
-      lerpEuler(spine, [0, Math.sin(t * 3) * 0.04, 0], fast);
-      lerpEuler(chest, [0.05, 0, 0], fast);
-      lerpEuler(neck, [-0.1, 0, waveCycle * 0.05], fast);
-      lerpEuler(leftUpperArm, [0, 0, 1.0 + waveCycle * 0.6], fast);
-      lerpEuler(rightUpperArm, [0, 0, -1.0 - waveCycle * 0.6], fast);
-      lerpEuler(leftLowerArm, [0.3 + waveCycle * 0.2, 0, 0], fast);
-      lerpEuler(rightLowerArm, [0.3 - waveCycle * 0.2, 0, 0], fast);
-      lerpEuler(leftUpperLeg, [-jumpCycle * 0.08, 0, 0], fast);
-      lerpEuler(rightUpperLeg, [-jumpCycle * 0.08, 0, 0], fast);
-      lerpExpression(vrm.expressionManager, "happy", 1.0, fast);
-      lerpExpression(vrm.expressionManager, "blink", blinkValue * 0.3, fast);
-      lerpExpression(vrm.expressionManager, "relaxed", 0, fast);
-      lerpExpression(vrm.expressionManager, "aa", jumpCycle * 0.3, fast);
-      lerpExpression(vrm.expressionManager, "surprised", 0, fast);
+      const jump = Math.abs(Math.sin(t * 6));
+      const wave = Math.sin(t * 8);
+      if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, jump * 0.12, fast); hips.position.x = THREE.MathUtils.lerp(hips.position.x, Math.sin(t * 3) * 0.03, fast); }
+      lerpEuler(bone("spine"), [0, Math.sin(t * 3) * 0.04, 0], fast);
+      lerpEuler(bone("chest"), [0.05, 0, 0], fast);
+      lerpEuler(bone("neck"), [-0.1, 0, wave * 0.05], fast);
+      lerpEuler(bone("leftUpperArm"), [0, 0, 1.0 + wave * 0.6], fast);
+      lerpEuler(bone("rightUpperArm"), [0, 0, -1.0 - wave * 0.6], fast);
+      lerpEuler(bone("leftLowerArm"), [0.3 + wave * 0.2, 0, 0], fast);
+      lerpEuler(bone("rightLowerArm"), [0.3 - wave * 0.2, 0, 0], fast);
+      lerpEuler(bone("leftUpperLeg"), [-jump * 0.08, 0, 0], fast);
+      lerpEuler(bone("rightUpperLeg"), [-jump * 0.08, 0, 0], fast);
+      lerpExpr(vrm.expressionManager, "happy", 1.0, fast);
+      lerpExpr(vrm.expressionManager, "blink", blinkVal * 0.3, fast);
+      lerpExpr(vrm.expressionManager, "relaxed", 0, fast);
+      lerpExpr(vrm.expressionManager, "aa", jump * 0.3, fast);
+      lerpExpr(vrm.expressionManager, "surprised", 0, fast);
 
     } else if (animation === "alert") {
       if (hips) { hips.position.y = THREE.MathUtils.lerp(hips.position.y, 0, fast); hips.position.x = THREE.MathUtils.lerp(hips.position.x, 0, fast); }
-      lerpEuler(spine, [-0.05, 0, 0], fast);
-      lerpEuler(chest, [-0.05, 0, 0], fast);
-      lerpEuler(neck, [-0.15, 0, 0], fast);
-      lerpEuler(leftUpperArm, [0, 0, 1.2], fast);
-      lerpEuler(rightUpperArm, [0, 0, -1.2], fast);
-      lerpEuler(leftLowerArm, [0, 0, 0.1], fast);
-      lerpEuler(rightLowerArm, [0, 0, -0.1], fast);
-      lerpExpression(vrm.expressionManager, "blink", 0, fast);
-      lerpExpression(vrm.expressionManager, "happy", 0.2, fast);
-      lerpExpression(vrm.expressionManager, "relaxed", 0, fast);
-      lerpExpression(vrm.expressionManager, "surprised", 0.8, fast);
-      lerpExpression(vrm.expressionManager, "aa", 0, fast);
+      lerpEuler(bone("spine"), [-0.05, 0, 0], fast);
+      lerpEuler(bone("chest"), [-0.05, 0, 0], fast);
+      lerpEuler(bone("neck"), [-0.15, 0, 0], fast);
+      lerpEuler(bone("leftUpperArm"), [0, 0, 1.2], fast);
+      lerpEuler(bone("rightUpperArm"), [0, 0, -1.2], fast);
+      lerpEuler(bone("leftLowerArm"), [0, 0, 0.1], fast);
+      lerpEuler(bone("rightLowerArm"), [0, 0, -0.1], fast);
+      lerpExpr(vrm.expressionManager, "blink", 0, fast);
+      lerpExpr(vrm.expressionManager, "happy", 0.2, fast);
+      lerpExpr(vrm.expressionManager, "relaxed", 0, fast);
+      lerpExpr(vrm.expressionManager, "surprised", 0.8, fast);
+      lerpExpr(vrm.expressionManager, "aa", 0, fast);
 
     } else {
-      // IDLE
-      if (hips) { hips.position.x = THREE.MathUtils.lerp(hips.position.x, swayCycle * 0.015, slow); hips.position.y = THREE.MathUtils.lerp(hips.position.y, breathCycle * 0.006, slow); }
-      lerpEuler(spine, [0, swayCycle * 0.02, microSway * 0.015], slow);
-      lerpEuler(chest, [breathCycle * 0.02, 0, 0], slow);
-      lerpEuler(neck, [0, swayCycle * 0.03, 0], slow);
-      lerpEuler(leftUpperArm, [0, 0, 1.1 + breathCycle * 0.03], slow);
-      lerpEuler(rightUpperArm, [0, 0, -1.1 - breathCycle * 0.03], slow);
-      lerpEuler(leftLowerArm, [0.15, 0, 0.1], slow);
-      lerpEuler(rightLowerArm, [0.15, 0, -0.1], slow);
-      lerpEuler(leftHand, [0, 0, 0.1], slow);
-      lerpEuler(rightHand, [0, 0, -0.1], slow);
-      lerpExpression(vrm.expressionManager, "relaxed", 0.25, slow);
-      lerpExpression(vrm.expressionManager, "happy", 0.15, slow);
-      lerpExpression(vrm.expressionManager, "blink", blinkValue, fast);
-      lerpExpression(vrm.expressionManager, "aa", 0, slow);
-      lerpExpression(vrm.expressionManager, "surprised", 0, slow);
+      if (hips) { hips.position.x = THREE.MathUtils.lerp(hips.position.x, sway * 0.015, slow); hips.position.y = THREE.MathUtils.lerp(hips.position.y, breath * 0.006, slow); }
+      lerpEuler(bone("spine"), [0, sway * 0.02, micro * 0.015], slow);
+      lerpEuler(bone("chest"), [breath * 0.02, 0, 0], slow);
+      lerpEuler(bone("neck"), [0, sway * 0.03, 0], slow);
+      lerpEuler(bone("leftUpperArm"), [0, 0, 1.1 + breath * 0.03], slow);
+      lerpEuler(bone("rightUpperArm"), [0, 0, -1.1 - breath * 0.03], slow);
+      lerpEuler(bone("leftLowerArm"), [0.15, 0, 0.1], slow);
+      lerpEuler(bone("rightLowerArm"), [0.15, 0, -0.1], slow);
+      lerpEuler(bone("leftHand"), [0, 0, 0.1], slow);
+      lerpEuler(bone("rightHand"), [0, 0, -0.1], slow);
+      lerpExpr(vrm.expressionManager, "relaxed", 0.25, slow);
+      lerpExpr(vrm.expressionManager, "happy", 0.15, slow);
+      lerpExpr(vrm.expressionManager, "blink", blinkVal, fast);
+      lerpExpr(vrm.expressionManager, "aa", 0, slow);
+      lerpExpr(vrm.expressionManager, "surprised", 0, slow);
     }
 
     vrm.update(delta);
@@ -205,35 +181,40 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
 
   if (!loaded) {
     return (
-      <group>
-        <mesh position={[0, 0, 0]}>
-          <sphereGeometry args={[0.25, 16, 16]} />
-          <meshStandardMaterial color="#6366f1" transparent opacity={0.35} wireframe />
-        </mesh>
-      </group>
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.25, 16, 16]} />
+        <meshStandardMaterial color="#6366f1" transparent opacity={0.3} wireframe />
+      </mesh>
     );
   }
 
-  return <primitive object={vrm!.scene} position={[0, -1.2, 0]} scale={[1.2, 1.2, 1.2]} />;
+  // Position: 0 Y, scale slightly bigger so full body is visible
+  return <primitive object={vrm!.scene} position={[0, -0.85, 0]} scale={[1.0, 1.0, 1.0]} />;
 };
 
 export const VRMPet = (props: VRMPetProps) => {
   return (
-    <div className="h-[480px] w-full cursor-grab active:cursor-grabbing">
-      <Canvas camera={{ position: [0, 1.1, 1.9], fov: 38 }} gl={{ antialias: true, alpha: true }}>
-        <ambientLight intensity={1.4} />
-        <directionalLight position={[3, 5, 3]} intensity={1.8} color="#ffffff" />
-        <pointLight position={[-4, 2, -2]} intensity={1.2} color="#a78bfa" />
-        <pointLight position={[4, 0, 2]} intensity={0.8} color="#34d399" />
+    <div style={{ height: "100%", width: "100%", minHeight: 480 }} className="cursor-grab active:cursor-grabbing">
+      <Canvas
+        // Camera pulled back and raised to frame full body
+        camera={{ position: [0, 0.6, 2.8], fov: 42 }}
+        gl={{ antialias: true, alpha: true }}
+        style={{ background: "transparent" }}
+      >
+        <ambientLight intensity={1.5} />
+        <directionalLight position={[2, 4, 3]} intensity={2.0} color="#ffffff" />
+        <pointLight position={[-3, 2, -2]} intensity={1.2} color="#a78bfa" />
+        <pointLight position={[3, 0, 2]} intensity={0.9} color="#34d399" />
+        <pointLight position={[0, -1, 2]} intensity={0.5} color="#f9a8d4" />
         <PetModel {...props} />
         <OrbitControls
           enablePan={false}
           enableZoom={false}
-          minPolarAngle={Math.PI / 2.8}
-          maxPolarAngle={Math.PI / 1.7}
-          minAzimuthAngle={-Math.PI / 4}
-          maxAzimuthAngle={Math.PI / 4}
-          dampingFactor={0.08}
+          minPolarAngle={Math.PI / 3}
+          maxPolarAngle={Math.PI / 1.8}
+          minAzimuthAngle={-Math.PI / 3}
+          maxAzimuthAngle={Math.PI / 3}
+          dampingFactor={0.06}
           enableDamping
         />
       </Canvas>

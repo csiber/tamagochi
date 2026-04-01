@@ -1,9 +1,14 @@
-import { Inter, Press_Start_2P } from "next/font/google";
+import { Outfit, Space_Mono } from "next/font/google";
 
-export const inter = Inter({ subsets: ["latin"] });
-
-export const pressStart = Press_Start_2P({
+export const outfit = Outfit({ 
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-press-start",
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+export const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-space-mono",
+  display: "swap",
 });
