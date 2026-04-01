@@ -6,32 +6,26 @@ interface ActionButtonsProps {
 }
 
 export const ActionButtons = ({ onFeed, onPlay, onRest, disabled }: ActionButtonsProps) => {
+  const buttons = [
+    { onClick: onFeed, icon: "🍬", label: "Etetés", color: "amber", desc: "+Éhség" },
+    { onClick: onPlay, icon: "🎮", label: "Játék", color: "pink", desc: "+Boldogság" },
+    { onClick: onRest, icon: "💤", label: "Pihenés", color: "emerald", desc: "+Energia" },
+  ];
+
   return (
-    <div className="grid grid-cols-3 gap-4">
-      <button 
-        onClick={onFeed}
-        disabled={disabled}
-        className="pixel-btn bento-card flex flex-col items-center gap-2 hover:bg-amber-500/10 hover:border-amber-500/50"
-      >
-        <span className="text-3xl">🍽️</span>
-        <span className="text-xs font-bold uppercase tracking-wider text-amber-500">Etetés</span>
-      </button>
-      <button 
-        onClick={onPlay}
-        disabled={disabled}
-        className="pixel-btn bento-card flex flex-col items-center gap-2 hover:bg-pink-500/10 hover:border-pink-500/50"
-      >
-        <span className="text-3xl">🎉</span>
-        <span className="text-xs font-bold uppercase tracking-wider text-pink-500">Játék</span>
-      </button>
-      <button 
-        onClick={onRest}
-        disabled={disabled}
-        className="pixel-btn bento-card flex flex-col items-center gap-2 hover:bg-emerald-500/10 hover:border-emerald-500/50"
-      >
-        <span className="text-3xl">⚡</span>
-        <span className="text-xs font-bold uppercase tracking-wider text-emerald-500">Pihenés</span>
-      </button>
+    <div className="grid grid-cols-3 gap-3">
+      {buttons.map(({ onClick, icon, label, color, desc }) => (
+        <button
+          key={label}
+          onClick={onClick}
+          disabled={disabled}
+          className={`pixel-btn bento-card flex flex-col items-center gap-2 py-4 hover:bg-${color}-500/10 hover:border-${color}-500/40 group`}
+        >
+          <span className="text-3xl group-hover:scale-110 transition-transform duration-200">{icon}</span>
+          <span className={`text-[11px] font-black uppercase tracking-wider text-${color}-400`}>{label}</span>
+          <span className="text-[9px] text-slate-600 font-medium">{desc}</span>
+        </button>
+      ))}
     </div>
   );
 };

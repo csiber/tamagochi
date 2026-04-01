@@ -9,11 +9,18 @@ import {
   useState,
 } from "react";
 
-// Dynamically import PetDisplay with SSR disabled
-const PetDisplay = dynamic(() => import("@/components/PetDisplay").then(mod => mod.PetDisplay), { 
-  ssr: false,
-  loading: () => <div className="flex h-full min-h-[400px] items-center justify-center text-slate-500 uppercase tracking-widest text-xs">3D Entitás ébredése...</div>
-});
+const PetDisplay = dynamic(
+  () => import("@/components/PetDisplay").then((mod) => mod.PetDisplay),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[480px] items-center justify-center flex-col gap-3">
+        <div className="h-12 w-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-600">3D entitás ébredése...</span>
+      </div>
+    ),
+  }
+);
 
 import { StatCard } from "@/components/StatCard";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -23,7 +30,6 @@ import { MiniGames } from "@/components/MiniGames";
 import { PartnerLinks } from "@/components/PartnerLinks";
 import { useSoundEffects } from "@/lib/sound-effects";
 
-// Types
 type PetAnimation = "idle" | "eat" | "play" | "sleep" | "alert";
 
 interface ActivityItem {
@@ -39,8 +45,7 @@ interface MoodOption {
   gradient: string;
 }
 
-// Constants
-const STORAGE_KEY = "tamagochi-state-v3";
+const STORAGE_KEY = "tamagochi-state-v4";
 const MAX_LOG_ITEMS = 10;
 
 const moodOptions: MoodOption[] = [
@@ -64,44 +69,40 @@ export default function Home() {
   const { playSuccess, playError, playNotification } = useSoundEffects();
   const animationTimeoutRef = useRef<number | null>(null);
 
-  // Helper: Add activity
   const addActivity = useCallback((message: string) => {
     setActivityLog((prev) => [
       { id: Date.now(), message, createdAt: new Date().toISOString() },
-      ...prev.slice(0, MAX_LOG_ITEMS - 1)
+      ...prev.slice(0, MAX_LOG_ITEMS - 1),
     ]);
   }, []);
 
-  // Helper: Trigger Animation
-  const triggerAnimation = useCallback((anim: PetAnimation, duration = 2000) => {
+  const triggerAnimation = useCallback((anim: PetAnimation, duration = 2500) => {
     if (animationTimeoutRef.current) window.clearTimeout(animationTimeoutRef.current);
     setPetAnimation(anim);
     animationTimeoutRef.current = window.setTimeout(() => setPetAnimation("idle"), duration);
   }, []);
 
-  // Actions
   const handleFeed = () => {
-    setStats(prev => ({ ...prev, hunger: clamp(prev.hunger + 20), energy: clamp(prev.energy + 5) }));
+    setStats((prev) => ({ ...prev, hunger: clamp(prev.hunger + 20), energy: clamp(prev.energy + 5) }));
     addActivity("Meg etetted a kis kedvencedet. 🍬");
     playNotification();
-    triggerAnimation("eat");
+    triggerAnimation("eat", 3000);
   };
 
   const handlePlay = () => {
-    setStats(prev => ({ ...prev, happiness: clamp(prev.happiness + 15), energy: clamp(prev.energy - 10) }));
+    setStats((prev) => ({ ...prev, happiness: clamp(prev.happiness + 15), energy: clamp(prev.energy - 10) }));
     addActivity("Játszottál egy jót! ✨");
     playNotification();
-    triggerAnimation("play");
+    triggerAnimation("play", 3000);
   };
 
   const handleRest = () => {
-    setStats(prev => ({ ...prev, energy: clamp(prev.energy + 25), hunger: clamp(prev.hunger - 5) }));
+    setStats((prev) => ({ ...prev, energy: clamp(prev.energy + 25), hunger: clamp(prev.hunger - 5) }));
     addActivity("A tamagochi elszenderedett... 💤");
     playNotification();
-    triggerAnimation("sleep", 3000);
+    triggerAnimation("sleep", 4000);
   };
 
-  // Hydration & Persistence
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -123,13 +124,12 @@ export default function Home() {
     }
   }, [stats, profileName, selectedMood, activityLog, isHydrated]);
 
-  // Tick logic
   useEffect(() => {
     const interval = setInterval(() => {
-      setStats(prev => ({
+      setStats((prev) => ({
         hunger: clamp(prev.hunger - 2),
         energy: clamp(prev.energy - 1.5),
-        happiness: clamp(prev.happiness - 1)
+        happiness: clamp(prev.happiness - 1),
       }));
       setNow(Date.now());
     }, 10000);
@@ -139,117 +139,112 @@ export default function Home() {
   const formatTime = (iso: string) => {
     const diff = Math.floor((now - new Date(iso).getTime()) / 1000);
     if (diff < 60) return "Most";
-    if (diff < 3600) return `${Math.floor(diff/60)}p`;
-    return `${Math.floor(diff/3600)}ó`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}p`;
+    return `${Math.floor(diff / 3600)}ó`;
   };
 
-  const activeMood = useMemo(() => moodOptions.find(m => m.id === selectedMood) || moodOptions[0], [selectedMood]);
+  const activeMood = useMemo(
+    () => moodOptions.find((m) => m.id === selectedMood) || moodOptions[0],
+    [selectedMood]
+  );
 
   if (!isHydrated) return null;
 
+  const overallHealth = Math.round((stats.hunger + stats.energy + stats.happiness) / 3);
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
-      {/* Header Section */}
-      <header className="mb-12 flex flex-col items-center justify-between gap-6 md:flex-row">
+      {/* Header */}
+      <header className="mb-10 flex flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex items-center gap-4">
-          <div className="avatar-initials text-xl">
+          <div className="avatar-initials text-base">
             {profileName ? profileName.slice(0, 2).toUpperCase() : "TG"}
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
               {profileName || "Névtelen Tamagochi"}
             </h1>
-            <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">
-              Gondozói Napló • LVL 1
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">
+                Gondozói Napló · LVL 1
+              </p>
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                {overallHealth}% Egészség
+              </span>
+            </div>
           </div>
         </div>
-        
-        <div className="flex gap-2">
-          <input 
-            type="text" 
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
             placeholder="Adj nevet neki..."
             value={profileName}
             onChange={(e) => setProfileName(e.target.value)}
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+            className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white placeholder:text-slate-600 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
         </div>
       </header>
 
-      {/* Main Grid: Bento Style */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        
-        {/* Left Column: Stats & Actions */}
-        <div className="flex flex-col gap-6 lg:col-span-4">
-          <StatCard 
-            label="Éhség" 
-            value={stats.hunger} 
-            icon="🍽️" 
-            colorClass="bg-amber-500" 
-          />
-          <StatCard 
-            label="Boldogság" 
-            value={stats.happiness} 
-            icon="🎉" 
-            colorClass="bg-pink-500" 
-          />
-          <StatCard 
-            label="Energia" 
-            value={stats.energy} 
-            icon="⚡" 
-            colorClass="bg-emerald-500" 
-          />
-          <ActionButtons 
-            onFeed={handleFeed} 
-            onPlay={handlePlay} 
-            onRest={handleRest} 
-            disabled={petAnimation !== 'idle'}
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+
+        {/* Left: Stats & Actions */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          <StatCard label="Éhség" value={stats.hunger} icon="🍬" colorClass="bg-amber-500" />
+          <StatCard label="Boldogság" value={stats.happiness} icon="🎉" colorClass="bg-pink-500" />
+          <StatCard label="Energia" value={stats.energy} icon="⚡" colorClass="bg-emerald-500" />
+          <ActionButtons
+            onFeed={handleFeed}
+            onPlay={handlePlay}
+            onRest={handleRest}
+            disabled={petAnimation !== "idle"}
           />
           <PartnerLinks />
         </div>
 
-        {/* Center Column: The Pet */}
+        {/* Center: The Pet */}
         <div className="lg:col-span-4">
-          <div className="bento-card flex h-full items-center justify-center bg-gradient-to-b from-white/[0.05] to-transparent">
+          <div className="bento-card flex h-full items-center justify-center min-h-[560px] bg-gradient-to-b from-indigo-500/[0.03] to-transparent">
             <PetDisplay animation={petAnimation} moodGradient={activeMood.gradient} />
           </div>
         </div>
 
-        {/* Right Column: Mood & Log */}
-        <div className="flex flex-col gap-6 lg:col-span-4">
-          <MoodSelector 
-            options={moodOptions} 
-            selectedId={selectedMood} 
+        {/* Right: Mood, Games, Log */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          <MoodSelector
+            options={moodOptions}
+            selectedId={selectedMood}
             onSelect={(id) => {
               setSelectedMood(id);
-              triggerAnimation("alert", 1000);
-              addActivity(`Aura váltás: ${id} 🌈`);
-            }} 
+              triggerAnimation("alert", 1200);
+              const mood = moodOptions.find(m => m.id === id);
+              addActivity(`Aura váltás: ${mood?.label} ${mood?.emoji}`);
+            }}
           />
-          <MiniGames 
+          <MiniGames
             onSuccess={(msg) => {
               addActivity(msg);
-              setStats(prev => ({ ...prev, happiness: clamp(prev.happiness + 10) }));
+              setStats((prev) => ({ ...prev, happiness: clamp(prev.happiness + 10) }));
               playSuccess();
               triggerAnimation("play");
             }}
             onMistake={(msg) => {
               addActivity(msg);
-              setStats(prev => ({ ...prev, happiness: clamp(prev.happiness - 5) }));
+              setStats((prev) => ({ ...prev, happiness: clamp(prev.happiness - 5) }));
               playError();
               triggerAnimation("alert");
             }}
           />
-          <ActivityLog 
-            activities={activityLog.map(a => ({ ...a, timeAgo: formatTime(a.createdAt) }))} 
+          <ActivityLog
+            activities={activityLog.map((a) => ({ ...a, timeAgo: formatTime(a.createdAt) }))}
           />
         </div>
       </div>
 
-      {/* Footer / Tip Section */}
-      <footer className="mt-12 text-center">
-        <p className="text-sm font-medium text-slate-600">
-          Tipp: A kiválasztott <span className="text-emerald-500">Aura</span> befolyásolja a kedvenced hangulatát!
+      <footer className="mt-10 text-center">
+        <p className="text-[11px] font-semibold text-slate-700 uppercase tracking-widest">
+          Tipp: Az <span className="text-indigo-500">Aura</span> hangulata befolyásolja a kedvenced lelkiállapotát
         </p>
       </footer>
     </main>
