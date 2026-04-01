@@ -45,6 +45,7 @@ const PetModel = ({ animation, vrmUrl }: VRMPetProps) => {
 
   useEffect(() => {
     const loader = new GLTFLoader();
+    // @ts-ignore – three-stdlib / @types/three KTX2Loader type mismatch
     loader.register((parser) => new VRMLoaderPlugin(parser));
     const urls = [vrmUrl, "/Twinkle_Yulelog.vrm"].filter(Boolean) as string[];
     const tryLoad = (index: number) => {
